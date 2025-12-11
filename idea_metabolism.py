@@ -332,11 +332,15 @@ class IdeaRepository:
         if evaluation.idea_id in self.evaluations:
             self.evaluations[evaluation.idea_id].append(evaluation)
     
-    def get_top_ideas(self, n: int = 10, metric: str = "overall_interest") -> List[tuple]:
-        """Get top N ideas by specified metric"""
+    def get_top_ideas(self, n: int = 10, metric: str = "overall_interest", problem_filter: Optional[str] = None) -> List[tuple]:
+        """Get top N ideas by specified metric, optionally filtered by problem"""
         
         scored_ideas = []
         for idea_id, idea in self.ideas.items():
+            # Apply problem filter if specified
+            if problem_filter and idea.problem_context != problem_filter:
+                continue
+                
             evals = self.evaluations.get(idea_id, [])
             if evals:
                 # Average score across evaluations
@@ -428,14 +432,16 @@ class IdeaMetabolismSystem:
         
         self.repository.save()
     
-    def display_top_ideas(self, n: int = 5):
+    def display_top_ideas(self, n: int = 5, problem: Optional[str] = None):
         """Display top N ideas by overall interest"""
         
         print(f"\n{'='*60}")
         print(f"TOP {n} IDEAS BY OVERALL INTEREST")
+        if problem:
+            print(f"For problem: {problem}")
         print(f"{'='*60}\n")
         
-        top_ideas = self.repository.get_top_ideas(n)
+        top_ideas = self.repository.get_top_ideas(n, problem_filter=problem)
         
         for i, (idea, score) in enumerate(top_ideas, 1):
             print(f"{i}. [{idea.persona.upper()}] Score: {score:.2f}")
@@ -459,7 +465,7 @@ class IdeaMetabolismSystem:
         self.run_triage_cycle(ideas)
         
         # Display results
-        self.display_top_ideas()
+        self.display_top_ideas(problem=problem)
         
         print(f"\nRepository saved to: {self.repository.filepath}")
         print(f"Total ideas in repository: {len(self.repository.ideas)}")
