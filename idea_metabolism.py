@@ -21,6 +21,7 @@ from datetime import datetime
 import numpy as np
 from sklearn.metrics.pairwise import cosine_similarity
 from sentence_transformers import SentenceTransformer
+from graph_repository import GraphRepository
 
 
 # Replace with your preferred LLM
@@ -379,7 +380,7 @@ class IdeaMetabolismSystem:
     
     def __init__(self, llm_provider: str = "anthropic"):
         self.llm = LLMClient(llm_provider)
-        self.repository = IdeaRepository()
+        self.repository = GraphRepository()
         self.evaluator = IdeaEvaluator(self.llm)
         
         # Initialize persona agents
@@ -401,10 +402,13 @@ class IdeaMetabolismSystem:
             print(f"Generating ideas from {agent.config['name']}...")
             ideas = agent.generate_ideas(problem, ideas_per_persona)
             
+            # Register problem in graph
+            problem_id = self.repository.add_problem(problem)
+            
             # Compute embeddings
             for idea in ideas:
                 idea.embedding = self.llm.get_embedding(idea.content)
-                self.repository.add_idea(idea)
+                self.repository.add_idea(idea, problem_id)
             
             all_ideas.extend(ideas)
             print(f"  Generated {len(ideas)} ideas\n")
@@ -415,10 +419,35 @@ class IdeaMetabolismSystem:
         """Run Stage 2: Evaluate and triage ideas"""
         
         print(f"\n{'='*60}")
-        print("STAGE 2: TRIAGE & EVALUATION")
+        print("STAGE 2: TRIAGE & EVALUATION (Graph RAG)")
         print(f"{'='*60}\n")
         
-        existing_ideas = list(self.repository.ideas.values())
+        # RAG: Retrieve context ideas based on current ideas' problem
+        # We assume all new ideas share the same problem context for now
+        if not ideas:
+            return
+            
+        current_problem = ideas[0].problem_context
+        context_dicts = self.repository.get_context_ideas(current_problem)
+        
+        # Convert dicts to Idea objects for Evaluator compatibility
+        # We create a temporary Idea class or simple object
+        existing_ideas = []
+        for d in context_dicts:
+             # Basic reconstruction
+             try:
+                 obj = Idea(
+                     id=d['id'],
+                     content=d.get('content',''),
+                     persona=d.get('persona',''),
+                     temperature=d.get('temperature',0.7),
+                     timestamp=d.get('timestamp',''),
+                     problem_context=d.get('problem_context',''),
+                     embedding=d.get('embedding')
+                 )
+                 existing_ideas.append(obj)
+             except:
+                 pass
         
         for idea in ideas:
             print(f"Evaluating idea {idea.id[:20]}...")
@@ -429,8 +458,64 @@ class IdeaMetabolismSystem:
             print(f"  Feasibility: {evaluation.feasibility_score:.2f}")
             print(f"  Surprise: {evaluation.surprise_score:.2f}")
             print(f"  Interest: {evaluation.overall_interest:.2f}\n")
+            
+        # Extract relationships (NEW)
+        self.extract_relationships(ideas, existing_ideas)
         
         self.repository.save()
+
+    def extract_relationships(self, new_ideas: List[Idea], existing_ideas: List[Idea]):
+        """Stage 3: Extract semantic relationships between ideas"""
+        print(f"\n{'='*60}")
+        print("STAGE 3: RELATIONSHIP EXTRACTION")
+        print(f"{'='*60}\n")
+        
+        if not existing_ideas:
+            return
+
+        # Simple batch processing for demo purposes
+        # Compares each new idea against top 5 most similar existing ideas to save tokens
+        
+        for idea in new_ideas:
+            # Simple retrieval of candidates based on embedding similarity would be better here
+            # For now, just compare against first few context ideas
+            candidates = existing_ideas[:5] 
+            
+            prompt = f"""Analyze relationships between this new idea and existing ideas.
+            
+NEW IDEA: {idea.content}
+
+EXISTING IDEAS:
+{json.dumps([{'id': e.id, 'content': e.content[:200]} for e in candidates], indent=2)}
+
+Identify if the NEW IDEA:
+1. CONTRADICTS any existing idea (fundamentally incompatible)
+2. REQUIRES any existing idea (is a prerequisite or dependency)
+
+Return JSON array of relationships:
+[
+  {{"target_id": "...", "type": "CONTRADICTS", "reason": "..."}},
+  {{"target_id": "...", "type": "REQUIRES", "reason": "..."}}
+]
+If no relationships, return []."""
+
+            response = self.llm.generate(prompt, temperature=0.1)
+            
+            try:
+                start = response.find('[')
+                end = response.rfind(']') + 1
+                rels = json.loads(response[start:end])
+                
+                for rel in rels:
+                    target_id = rel.get('target_id')
+                    rel_type = rel.get('type')
+                    reason = rel.get('reason')
+                    
+                    if target_id and rel_type in ["CONTRADICTS", "REQUIRES"]:
+                        self.repository.add_relationship(idea.id, target_id, rel_type, reason)
+                        print(f"  [RELATIONSHIP] {rel_type}: {reason[:100]}...")
+            except:
+                pass
     
     def display_top_ideas(self, n: int = 5, problem: Optional[str] = None):
         """Display top N ideas by overall interest"""
@@ -447,7 +532,7 @@ class IdeaMetabolismSystem:
             print(f"{i}. [{idea.persona.upper()}] Score: {score:.2f}")
             print(f"   {idea.content[:200]}...")
             
-            evals = self.repository.evaluations[idea.id]
+            evals = self.repository.get_evaluations(idea.id)
             if evals:
                 eval_summary = evals[0]
                 print(f"   Reasoning: {eval_summary.reasoning[:150]}...")
@@ -468,7 +553,7 @@ class IdeaMetabolismSystem:
         self.display_top_ideas(problem=problem)
         
         print(f"\nRepository saved to: {self.repository.filepath}")
-        print(f"Total ideas in repository: {len(self.repository.ideas)}")
+        print(f"Total ideas in repository: {self.repository.count_ideas()}")
 
 
 # Example usage
