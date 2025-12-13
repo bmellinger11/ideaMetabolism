@@ -526,10 +526,40 @@ If no relationships, return []."""
         if not ideas:
             return
 
-        # 1. Selection: Find Novel and Feasible parents from current batch
+        # 1. Selection: Find Novel and Feasible parents from current batch AND history
+        
+        # Get historical context ideas
+        current_problem = ideas[0].problem_context
+        context_dicts = self.repository.get_context_ideas(current_problem)
+        
+        historical_ideas = []
+        for d in context_dicts:
+             try:
+                 obj = Idea(
+                     id=d['id'],
+                     content=d.get('content',''),
+                     persona=d.get('persona',''),
+                     temperature=d.get('temperature',0.7),
+                     timestamp=d.get('timestamp',''),
+                     problem_context=d.get('problem_context',''),
+                     embedding=d.get('embedding')
+                 )
+                 historical_ideas.append(obj)
+             except:
+                 pass
+
+        # Combine candidates (ensure uniqueness by ID)
+        all_candidates = {idea.id: idea for idea in ideas}
+        for h_idea in historical_ideas:
+            if h_idea.id not in all_candidates:
+                all_candidates[h_idea.id] = h_idea
+        
+        candidate_list = list(all_candidates.values())
+        print(f"Breeding Pool Size: {len(candidate_list)} ideas (Current + History)")
+
         # We need the evaluations for these ideas
         scored_candidates = []
-        for idea in ideas:
+        for idea in candidate_list:
             evals = self.repository.get_evaluations(idea.id)
             if evals:
                 # Use first evaluation
