@@ -1,0 +1,312 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Idea Metabolism</title>
+    <style>
+        :root {
+            --primary: #2563eb;
+            --primary-hover: #1d4ed8;
+            --bg: #f8fafc;
+            --card-bg: #ffffff;
+            --text-main: #1e293b;
+            --text-secondary: #64748b;
+            --border: #e2e8f0;
+        }
+
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            background-color: var(--bg);
+            color: var(--text-main);
+            margin: 0;
+            padding: 20px;
+            line-height: 1.5;
+        }
+
+        .container {
+            max-width: 600px;
+            margin: 0 auto;
+        }
+
+        header {
+            text-align: center;
+            margin-bottom: 2rem;
+        }
+
+        h1 {
+            font-size: 2rem;
+            margin-bottom: 0.5rem;
+            color: var(--primary);
+        }
+
+        .intro {
+            color: var(--text-secondary);
+            font-size: 0.95rem;
+        }
+
+        .input-group {
+            background: var(--card-bg);
+            padding: 1.5rem;
+            border-radius: 12px;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
+            margin-bottom: 2rem;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 0.5rem;
+            font-weight: 500;
+        }
+
+        input[type="text"], input[type="number"] {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            font-size: 1rem;
+            box-sizing: border-box; /* Fixes padding issue */
+            margin-bottom: 1rem;
+        }
+
+        input[type="text"]::placeholder {
+            color: #94a3b8;
+        }
+
+        .options {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 1rem;
+        }
+
+        /* Checkbox style */
+        input[type="checkbox"] {
+            width: 1.2em;
+            height: 1.2em;
+            cursor: pointer;
+        }
+
+        .limit-input {
+            display: none; /* Hidden by default */
+            flex: 1;
+        }
+        
+        .limit-input.active {
+            display: block;
+        }
+
+        button {
+            width: 100%;
+            background-color: var(--primary);
+            color: white;
+            padding: 12px;
+            border: none;
+            border-radius: 6px;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background-color 0.2s;
+        }
+
+        button:hover {
+            background-color: var(--primary-hover);
+        }
+        
+        button:disabled {
+            background-color: #94a3b8;
+            cursor: not-allowed;
+        }
+
+        .results {
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
+        }
+
+        .card {
+            background: var(--card-bg);
+            padding: 1.5rem;
+            border-radius: 12px;
+            border: 1px solid var(--border);
+            box-shadow: 0 2px 4px rgba(0,0,0,0.02);
+            transition: transform 0.2s;
+        }
+        
+        .card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 6px rgba(0,0,0,0.05);
+        }
+
+        .card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 0.8rem;
+            font-size: 0.85rem;
+        }
+
+        .persona {
+            text-transform: uppercase;
+            font-weight: 700;
+            color: var(--primary);
+            background: #eff6ff;
+            padding: 2px 8px;
+            border-radius: 4px;
+        }
+
+        .score {
+            font-weight: 600;
+            color: var(--text-secondary);
+        }
+
+        .content {
+            font-size: 1rem;
+            margin-bottom: 1rem;
+            white-space: pre-wrap;
+        }
+
+        .reasoning {
+            font-size: 0.85rem;
+            color: var(--text-secondary);
+            background: #f1f5f9;
+            padding: 10px;
+            border-radius: 6px;
+            border-left: 3px solid var(--primary);
+        }
+        
+        .loading {
+            text-align: center;
+            color: var(--text-secondary);
+            display: none;
+            margin: 2rem 0;
+        }
+        
+        .source-tag {
+            font-size: 0.75rem;
+            color: #64748b;
+            margin-left: 10px;
+        }
+
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>Idea Metabolism</h1>
+            <p class="intro">
+                A system where ideas are not just generated once but are stored, retrieved, and critiqued in a persistent knowledge graph.
+                Breeds new ideas from the best of the past.
+            </p>
+        </header>
+
+        <div class="input-group">
+            <label for="problem">Problem Statement</label>
+            <input type="text" id="problem" placeholder="e.g., How to reduce plastic waste in oceans?">
+
+            <div class="options">
+                <input type="checkbox" id="repoOnly" onchange="toggleLimit()">
+                <label for="repoOnly" style="margin:0; cursor:pointer;">Search Repository Only</label>
+            </div>
+            
+            <div id="limitContainer" class="limit-input">
+                 <!-- Hidden by default, shown via JS -->
+                 <label for="limit" style="font-size:0.9rem">Max Ideas to Retrieve</label>
+                 <input type="number" id="limit" value="5" min="1" max="20">
+            </div>
+
+            <button onclick="processIdea()" id="submitBtn">Generate / Search</button>
+        </div>
+        
+        <div id="loading" class="loading">
+            Processing... This may take a moment.
+        </div>
+
+        <div id="results" class="results">
+            <!-- Cards go here -->
+        </div>
+    </div>
+
+    <script>
+        function toggleLimit() {
+            const isChecked = document.getElementById('repoOnly').checked;
+            const container = document.getElementById('limitContainer');
+            if (isChecked) {
+                container.classList.add('active');
+            } else {
+                container.classList.remove('active');
+            }
+        }
+
+        async function processIdea() {
+            const problem = document.getElementById('problem').value;
+            const repoOnly = document.getElementById('repoOnly').checked;
+            const limit = document.getElementById('limit').value;
+            const btn = document.getElementById('submitBtn');
+            const loading = document.getElementById('loading');
+            const resultsDiv = document.getElementById('results');
+
+            if (!problem.trim()) {
+                alert("Please enter a problem statement.");
+                return;
+            }
+
+            // UI State
+            btn.disabled = true;
+            loading.style.display = "block";
+            resultsDiv.innerHTML = ""; // Clear previous
+
+            try {
+                const response = await fetch('/api/process', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ 
+                        problem: problem, 
+                        repoOnly: repoOnly, 
+                        limit: limit 
+                    })
+                });
+                
+                const data = await response.json();
+                
+                if (data.error) {
+                    resultsDiv.innerHTML = `<p style="color:red">Error: ${data.error}</p>`;
+                } else {
+                    renderResults(data.results);
+                }
+
+            } catch (err) {
+                resultsDiv.innerHTML = `<p style="color:red">Network Error: ${err.message}</p>`;
+            } finally {
+                btn.disabled = false;
+                loading.style.display = "none";
+            }
+        }
+
+        function renderResults(ideas) {
+            const container = document.getElementById('results');
+            
+            if (ideas.length === 0) {
+                container.innerHTML = "<p style='text-align:center; color:#64748b'>No results found.</p>";
+                return;
+            }
+
+            const html = ideas.map(idea => `
+                <div class="card">
+                    <div class="card-header">
+                        <div>
+                            <span class="persona">${idea.persona}</span>
+                            <span class="source-tag">(${idea.source})</span>
+                        </div>
+                        <span class="score">Interest: ${idea.score.toFixed(2)}</span>
+                    </div>
+                    <div class="content">${idea.content}</div>
+                    ${idea.reasoning ? `<div class="reasoning"><strong>Evaluation:</strong> ${idea.reasoning}</div>` : ''}
+                </div>
+            `).join('');
+            
+            container.innerHTML = html;
+        }
+    </script>
+</body>
+</html>

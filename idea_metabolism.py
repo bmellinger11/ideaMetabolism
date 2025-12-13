@@ -720,6 +720,81 @@ Format as JSON:
         print(f"Total ideas in repository: {self.repository.count_ideas()}")
 
 
+    
+    def process_problem(self, problem: str, repo_only: bool = False, limit: int = 5) -> List[Dict]:
+        """Process a problem statement and return structured results"""
+        
+        results = []
+        
+        if repo_only:
+            # Semantic Search Mode
+            # Re-using context retrieval logic
+            context_dicts = self.repository.get_context_ideas(problem)
+            
+            # Convert to objects
+            found_ideas = []
+            for d in context_dicts:
+                 try:
+                     obj = Idea(
+                         id=d['id'],
+                         content=d.get('content',''),
+                         persona=d.get('persona',''),
+                         temperature=d.get('temperature',0.7),
+                         timestamp=d.get('timestamp',''),
+                         problem_context=d.get('problem_context',''),
+                         embedding=d.get('embedding')
+                     )
+                     found_ideas.append(obj)
+                 except:
+                     pass
+            
+            # Formatting results
+            for i, idea in enumerate(found_ideas):
+                if i >= limit:
+                    break
+                
+                score = 0
+                reasoning = ""
+                evals = self.repository.get_evaluations(idea.id)
+                if evals:
+                    score = getattr(evals[0], 'overall_interest', 0)
+                    reasoning = evals[0].reasoning
+                
+                results.append({
+                    "id": idea.id,
+                    "persona": idea.persona,
+                    "content": idea.content,
+                    "score": score,
+                    "reasoning": reasoning,
+                    "source": "repository"
+                })
+                
+        else:
+            # Generation Mode
+            # Run the full pipeline
+            # Suppress stdout to keep API clean? Or just let it print to server logs.
+            self.run(problem, ideas_per_persona=3)
+            
+            # Retrieve top results
+            top_ideas = self.repository.get_top_ideas(limit, problem_filter=problem)
+            
+            for idea, score in top_ideas:
+                reasoning = ""
+                evals = self.repository.get_evaluations(idea.id)
+                if evals:
+                    reasoning = evals[0].reasoning
+                
+                results.append({
+                    "id": idea.id,
+                    "persona": idea.persona,
+                    "content": idea.content,
+                    "score": score,
+                    "reasoning": reasoning,
+                    "source": "generated"
+                })
+                
+        return results
+
 # Example usage
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Idea Metabolism System")
@@ -738,59 +813,29 @@ if __name__ == "__main__":
     # Initialize system
     system = IdeaMetabolismSystem(llm_provider="anthropic")
     
+    # Run using the new API method logic for consistent behavior
+    # Note: run() inside process_problem prints logs, which is fine for CLI.
+    # The return value also lets us print the final list if we wanted to replace display_top_ideas,
+    # but display_top_ideas is nice for CLI formatting.
+    
     if args.repo_only:
-        # Repo-only mode: Semantic search
         print(f"\nsearching repository for: {problem}")
         print(f"Limit: {args.repo_only} ideas\n")
         
-        # We use the semantic retrieval logic directly
-        # Re-using context retrieval logic from run_triage_cycle
-        context_dicts = system.repository.get_context_ideas(problem)
+        results = system.process_problem(problem, repo_only=True, limit=args.repo_only)
         
-        # Convert to objects
-        found_ideas = []
-        for d in context_dicts:
-             try:
-                 obj = Idea(
-                     id=d['id'],
-                     content=d.get('content',''),
-                     persona=d.get('persona',''),
-                     temperature=d.get('temperature',0.7),
-                     timestamp=d.get('timestamp',''),
-                     problem_context=d.get('problem_context',''),
-                     embedding=d.get('embedding')
-                 )
-                 found_ideas.append(obj)
-             except:
-                 pass
+        print(f"Found {len(results)} relevant ideas in context.\n")
         
-        # Sort/Limit might be needed if context_ideas returns too many
-        # get_context_ideas uses finding similar problems + getting all their ideas
-        # We might want to re-rank by similarity to current query if we want strictly "best matches"
-        # For now, let's just take top N from the retrieved set
-        
-        limit = args.repo_only
-        displayed = 0
-        
-        print(f"Found {len(found_ideas)} relevant ideas in context.\n")
-        
-        for i, idea in enumerate(found_ideas):
-            if displayed >= limit:
-                break
-            
-            # Get eval if exists
-            score = 0
-            evals = system.repository.get_evaluations(idea.id)
-            if evals:
-                score = getattr(evals[0], 'overall_interest', 0)
-            
-            print(f"{i+1}. [{idea.persona.upper()}] Score: {score:.2f}")
-            print(f"   {idea.content[:200]}...")
-            if evals:
-                 print(f"   Reasoning: {evals[0].reasoning[:150]}...")
-            print()
-            displayed += 1
-
+        for i, res in enumerate(results, 1):
+             print(f"{i}. [{res['persona'].upper()}] Score: {res['score']:.2f}")
+             print(f"   {res['content'][:200]}...")
+             if res['reasoning']:
+                 print(f"   Reasoning: {res['reasoning'][:150]}...")
+             print()
     else:
-        # Standard Run
-        system.run(problem, ideas_per_persona=3)
+        # Standard run prints its own output via display_top_ideas inside run()
+        # We can just call process_problem to exercise that path if we want, 
+        # or stick to system.run() which is what process_problem calls.
+        # To ensure process_problem is 'the' API, let's use it, but ignored return for CLI output 
+        # since run() prints everything.
+        system.process_problem(problem, repo_only=False)
