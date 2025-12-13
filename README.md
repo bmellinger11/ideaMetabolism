@@ -4,7 +4,7 @@ A multi-agent AI system for generating, evaluating, and evolving ideas over time
 
 ## Purpose
 
-Standard LLM interactions are ephemeral: you ask for ideas, get a list, and the context vanishes. **Idea Metabolism** treats ideas as persistent entities that reside in a "collective memory."
+Standard LLM interactions are ephemeral: you ask for ideas, get a list, and the context vanishes. **Idea Metabolism** treats ideas as persistent entities that reside in a "collective memory". Knowledge accumulates in the collective memory, allowing the system to generate, evaluate, and evolve ideas over time as new information becomes available. Inspired by human creative processes, the system can generate, evaluate, and evolve ideas over time as new information becomes available. This POC is a step in overcoming the backward-looking nature of LLMs which are subject to representational collapse optimizing for known distributions and penalizing divergence thus stifling innovation.
 
 Key capabilities:
 *   **Diverse Personas**: "Convergent", "Divergent", and "Alternative" agents generate distinct types of ideas.
