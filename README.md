@@ -59,6 +59,18 @@ To generate ideas for a specific problem:
 
 ```bash
 python idea_metabolism.py --problem "How to reduce plastic waste in oceans?"
+# OR
+python idea_metabolism.py -p "How to reduce plastic waste in oceans?"
+```
+
+To query the repository for similar existing ideas (skip generation):
+
+```bash
+# Get top 5 relevant ideas
+python idea_metabolism.py -p "How to reduce plastic waste?" --repo-only
+
+# Get top 3 relevant ideas
+python idea_metabolism.py -p "How to reduce plastic waste?" -r 3
 ```
 
 The system will:

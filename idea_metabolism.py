@@ -6,6 +6,7 @@ diverse personas and building a queryable knowledge repository.
 
 Usage:
     python idea_metabolism.py --problem "your problem statement"
+    python idea_metabolism.py --problem "your problem statement" --repo-only 5
     
 Requirements:
     pip install anthropic openai google-generativeai numpy scikit-learn
@@ -14,6 +15,8 @@ Requirements:
 import os
 import json
 import time
+import argparse
+import sys
 from dotenv import load_dotenv
 from dataclasses import dataclass, asdict
 from typing import List, Dict, Optional, Literal
@@ -719,17 +722,75 @@ Format as JSON:
 
 # Example usage
 if __name__ == "__main__":
-    import sys
+    parser = argparse.ArgumentParser(description="Idea Metabolism System")
+    parser.add_argument("-p", "--problem", type=str, help="The problem statement to address")
+    parser.add_argument("-r", "--repo-only", nargs="?", const=5, type=int, 
+                        help="Only query repository for existing ideas related to problem (default 5 results)")
     
-    # Get problem from command line or use default
-    if len(sys.argv) > 1:
-        problem = " ".join(sys.argv[1:])
-    else:
-        problem = """How can we create machine learning systems that generate truly novel ideas 
-        rather than just recombining existing patterns from training data?"""
+    args = parser.parse_args()
+    
+    if not args.problem:
+        parser.print_help()
+        sys.exit(1)
+        
+    problem = args.problem
     
     # Initialize system
     system = IdeaMetabolismSystem(llm_provider="anthropic")
     
-    # Run generation and triage
-    system.run(problem, ideas_per_persona=3)
+    if args.repo_only:
+        # Repo-only mode: Semantic search
+        print(f"\nsearching repository for: {problem}")
+        print(f"Limit: {args.repo_only} ideas\n")
+        
+        # We use the semantic retrieval logic directly
+        # Re-using context retrieval logic from run_triage_cycle
+        context_dicts = system.repository.get_context_ideas(problem)
+        
+        # Convert to objects
+        found_ideas = []
+        for d in context_dicts:
+             try:
+                 obj = Idea(
+                     id=d['id'],
+                     content=d.get('content',''),
+                     persona=d.get('persona',''),
+                     temperature=d.get('temperature',0.7),
+                     timestamp=d.get('timestamp',''),
+                     problem_context=d.get('problem_context',''),
+                     embedding=d.get('embedding')
+                 )
+                 found_ideas.append(obj)
+             except:
+                 pass
+        
+        # Sort/Limit might be needed if context_ideas returns too many
+        # get_context_ideas uses finding similar problems + getting all their ideas
+        # We might want to re-rank by similarity to current query if we want strictly "best matches"
+        # For now, let's just take top N from the retrieved set
+        
+        limit = args.repo_only
+        displayed = 0
+        
+        print(f"Found {len(found_ideas)} relevant ideas in context.\n")
+        
+        for i, idea in enumerate(found_ideas):
+            if displayed >= limit:
+                break
+            
+            # Get eval if exists
+            score = 0
+            evals = system.repository.get_evaluations(idea.id)
+            if evals:
+                score = getattr(evals[0], 'overall_interest', 0)
+            
+            print(f"{i+1}. [{idea.persona.upper()}] Score: {score:.2f}")
+            print(f"   {idea.content[:200]}...")
+            if evals:
+                 print(f"   Reasoning: {evals[0].reasoning[:150]}...")
+            print()
+            displayed += 1
+
+    else:
+        # Standard Run
+        system.run(problem, ideas_per_persona=3)
