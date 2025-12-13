@@ -516,6 +516,134 @@ If no relationships, return []."""
                         print(f"  [RELATIONSHIP] {rel_type}: {reason[:100]}...")
             except:
                 pass
+
+    def run_evolution_cycle(self, ideas: List[Idea]):
+        """Stage 4: Evolutionary Synthesis (Breeding)"""
+        print(f"\n{'='*60}")
+        print("STAGE 4: EVOLUTIONARY SYNTHESIS")
+        print(f"{'='*60}\n")
+        
+        if not ideas:
+            return
+
+        # 1. Selection: Find Novel and Feasible parents from current batch
+        # We need the evaluations for these ideas
+        scored_candidates = []
+        for idea in ideas:
+            evals = self.repository.get_evaluations(idea.id)
+            if evals:
+                # Use first evaluation
+                e = evals[0]
+                scored_candidates.append({
+                    "idea": idea,
+                    "novelty": getattr(e, "novelty_score", 0),
+                    "feasibility": getattr(e, "feasibility_score", 0)
+                })
+        
+        if len(scored_candidates) < 2:
+            print("Not enough evaluated ideas for breeding.")
+            return
+
+        # Select Parent A (Most Novel)
+        parent_a_data = max(scored_candidates, key=lambda x: x['novelty'])
+        parent_a = parent_a_data['idea']
+        
+        # Select Parent B (Most Feasible) - distinct from A
+        remaining = [c for c in scored_candidates if c['idea'].id != parent_a.id]
+        if not remaining:
+            return
+            
+        parent_b_data = max(remaining, key=lambda x: x['feasibility'])
+        parent_b = parent_b_data['idea']
+        
+        print(f"Parent A (Novelty {parent_a_data['novelty']:.2f}): {parent_a.content[:50]}...")
+        print(f"Parent B (Feasibility {parent_b_data['feasibility']:.2f}): {parent_b.content[:50]}...")
+        
+        # 2. Crossover & Mutation
+        prompt = f"""Perform an evolutionary synthesis of two ideas.
+        
+PARENT A (High Novelty):
+{parent_a.content}
+
+PARENT B (High Feasibility):
+{parent_b.content}
+
+PROBLEM: {parent_a.problem_context}
+
+TASK: Generate a "Child Idea" that combines the core novel mechanism of Parent A with the practical grounding of Parent B.
+The child should be a distinct concept, not just a concatenation. 
+Mutate the idea slightly to ensure it evolves beyond both parents.
+
+Format as JSON:
+{{
+  "idea": "...",
+  "rationale": "...",
+  "assumptions": "..."
+}}"""
+
+        response = self.llm.generate(prompt, temperature=0.7)
+        
+        try:
+            start = response.find('{')
+            end = response.rfind('}') + 1
+            child_data = json.loads(response[start:end])
+            
+            child_text = f"{child_data.get('idea', '')}\n\nRationale: {child_data.get('rationale', '')}\nAssumptions: {child_data.get('assumptions', '')}"
+            
+            # 3. Integration
+            child_id = f"child_{int(time.time())}"
+            child_idea = Idea(
+                id=child_id,
+                content=child_text,
+                persona="evolutionary_synthesis",
+                temperature=0.7,
+                timestamp=datetime.now().isoformat(),
+                problem_context=parent_a.problem_context,
+                embedding=None
+            )
+            
+            # Embed and Add
+            child_idea.embedding = self.llm.get_embedding(child_idea.content)
+            
+            # Register with graph (using existing problem ID lookup would be better, but we can pass text logic in add_idea or similar)
+            # We need the problem ID. 
+            # Currently add_idea takes idea and problem_id.
+            # We can re-fetch or track problem_id.
+            # Let's peek at how we handled it in generation cycle. We retrieved problem_id there.
+            # We can lookup problem ID by hashing text or finding the node.
+            # GraphRepository doesn't expose lookup easily yet without re-hashing.
+            # Let's use `add_problem` which is idempotent and returns ID.
+            problem_id = self.repository.add_problem(child_idea.problem_context)
+            
+            self.repository.add_idea(child_idea, problem_id)
+            print(f"\nCreated Child Idea: {child_idea.content[:100]}...")
+            
+            # Add Lineage Edges
+            self.repository.add_relationship(child_id, parent_a.id, "DERIVED_FROM", "Novelty Parent")
+            self.repository.add_relationship(child_id, parent_b.id, "DERIVED_FROM", "Feasibility Parent")
+            
+            # Evaluate Child
+            print("Evaluating Child...")
+            # We need existing ideas list again.
+            # We can pass the full graph context or just the current batch + parents
+            # Let's retrieve context again or use 'ideas' list which is the batch
+            # Ideally we check against broader context.
+            context_dicts = self.repository.get_context_ideas(child_idea.problem_context)
+            # Reconstruct... (This logic is duplicated, suggests need for helper)
+            existing_for_eval = [] # ... skipped for brevity, let's use the 'ideas' batch + parents
+            existing_for_eval.extend(ideas)
+            
+            evaluation = self.evaluator.evaluate_idea(child_idea, existing_for_eval)
+            self.repository.add_evaluation(evaluation)
+            
+            print(f"  Novelty: {evaluation.novelty_score:.2f}")
+            print(f"  Feasibility: {evaluation.feasibility_score:.2f}")
+            print(f"  Interest: {evaluation.overall_interest:.2f}\n")
+            
+        except json.JSONDecodeError:
+            print("Failed to generate valid JSON for child idea.")
+        except Exception as e:
+            print(f"Error during evolution: {e}")
     
     def display_top_ideas(self, n: int = 5, problem: Optional[str] = None):
         """Display top N ideas by overall interest"""
@@ -548,6 +676,9 @@ If no relationships, return []."""
         
         # Stage 2: Triage
         self.run_triage_cycle(ideas)
+        
+        # Stage 4: Evolution (NEW)
+        self.run_evolution_cycle(ideas)
         
         # Display results
         self.display_top_ideas(problem=problem)

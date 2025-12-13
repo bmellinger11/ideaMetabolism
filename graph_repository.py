@@ -225,7 +225,7 @@ class GraphRepository:
         # We need to handle serialization of embeddings manually or use Pickle/JSON-Link.
         # For this POC, let's use a custom JSON format that reconstructs the graph.
         
-        data = nx.node_link_data(self.graph)
+        data = nx.node_link_data(self.graph, edges="links")
         with open(self.filepath, 'w') as f:
             json.dump(data, f)
 
@@ -234,7 +234,7 @@ class GraphRepository:
         if os.path.exists(self.filepath):
             with open(self.filepath, 'r') as f:
                 data = json.load(f)
-            self.graph = nx.node_link_graph(data)
+            self.graph = nx.node_link_graph(data, edges="links")
 
     def migrate_from_json(self, json_path: str):
         """One-time migration utility"""

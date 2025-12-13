@@ -11,14 +11,15 @@ Key capabilities:
 *   **Persistent Memory**: Ideas are stored in a Graph RAG repository, allowing the system to recall past solutions.
 *   **Semantic Novelty**: The system calculates how "new" an idea is by comparing its vector embedding against the existing knowledge graph.
 *   **Relationship Mapping**: Automatically detects if new ideas **CONTRADICT** or **REQUIRE** existing ideas.
+*   **Evolutionary Synthesis**: Actively "breeds" new ideas by combining the most *Novel* idea with the most *Feasible* idea from each generation cycle, creating offspring that inherit traits from both.
 
 ## Architecture
 
 ### Core Components
-*   **`idea_metabolism.py`**: The main orchestrator. Manages the LLM client, agents, and the 3-stage pipeline (Generation -> Triage -> Relationship Extraction).
+*   **`idea_metabolism.py`**: The main orchestrator. Manages the LLM client, agents, and the 4-stage pipeline (Generation -> Triage -> Relationship Extraction -> Evolution).
 *   **`graph_repository.py`**: A **NetworkX**-based graph database.
     *   **Nodes**: Problems, Ideas, Domains.
-    *   **Edges**: `ADDRESSES`, `RELATES_TO`, `CONTRADICTS`, `REQUIRES`.
+    *   **Edges**: `ADDRESSES`, `RELATES_TO`, `CONTRADICTS`, `REQUIRES`, `DERIVED_FROM`.
     *   **Vector Search**: Uses `sentence-transformers` for semantic retrieval of problem contexts.
 
 ### Data Flow
@@ -26,6 +27,7 @@ Key capabilities:
 2.  **Graph RAG**: The system embeds the Problem and retrieves semantically similar "Context Ideas" from the graph.
 3.  **Evaluation**: An Evaluator Agent scores new ideas on Novelty, Feasibility, and Surprise relative to the retrieved context.
 4.  **Linking**: The system identifies and creates semantic edges between new and existing ideas.
+5.  **Evolution**: The system identifies the "Most Novel" and "Most Feasible" ideas in the batch and synthesizes a "Child Idea" that attempts to maximize both traits. This child is then evaluated and stored with `DERIVED_FROM` lineage edges.
 
 ## Setup & Usage
 
