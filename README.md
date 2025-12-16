@@ -1,6 +1,6 @@
 # Idea Metabolism POC
 
-A multi-agent AI system for generating, evaluating, and evolving ideas over time. This Proof of Concept (POC) demonstrates a "metabolic" approach to ideation where ideas are not just generated once but are stored, retrieved, and critiqued in a persistent knowledge graph.
+A Persistent Creative Intelligence System that Learns and Evolves Ideas Over Time. Unlike traditional AI that forgets each conversation, this system builds a living memory of ideas that grow smarter through specialized AI personas, semantic analysis, and evolutionary breeding of concepts—transforming one-shot brainstorming into continuous creative intelligence.
 
 ## Purpose
 
