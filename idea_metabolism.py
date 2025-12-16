@@ -597,6 +597,7 @@ If no relationships, return []."""
                 all_candidates[h_idea.id] = h_idea
         
         candidate_list = list(all_candidates.values())
+
         logger.info(f"Breeding Pool Size: {len(candidate_list)} ideas (Current + History)")
 
         # We need the evaluations for these ideas
@@ -611,9 +612,11 @@ If no relationships, return []."""
                     "novelty": getattr(e, "novelty_score", 0),
                     "feasibility": getattr(e, "feasibility_score", 0)
                 })
+            else:
+                logger.warning(f"  Skipping {idea.id} for breeding: No evaluation found.")
         
         if len(scored_candidates) < 2:
-            logger.info("Not enough evaluated ideas for breeding.")
+            logger.info(f"Not enough evaluated ideas for breeding. Need 2, have {len(scored_candidates)}.")
             return
 
         # Select Parent A (Most Novel)
@@ -712,10 +715,17 @@ Format as JSON:
             logger.info(f"  Feasibility: {evaluation.feasibility_score:.2f}")
             logger.info(f"  Interest: {evaluation.overall_interest:.2f}\n")
             
+            # Extract Relationships for Child
+            logger.info("Extracting relationships for child idea...")
+            self.extract_relationships([child_idea], existing_for_eval)
+            
         except json.JSONDecodeError:
             logger.error("Failed to generate valid JSON for child idea.")
         except Exception as e:
             logger.error(f"Error during evolution: {e}")
+            
+        # Ensure changes are saved to disk
+        self.repository.save()
     
     def display_top_ideas(self, n: int = 5, problem: Optional[str] = None):
         """Display top N ideas by overall interest"""
