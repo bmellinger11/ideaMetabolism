@@ -66,6 +66,7 @@ python idea_metabolism.py -p "How to reduce plastic waste in oceans?" -n 2
 **Options:**
 *   `-p`, `--problem`: The problem statement (required).
 *   `-n`, `--ideas-per-persona`: Number of ideas to generate per persona (default: 1).
+*   `-r`, `--repo-only`: Search existing ideas instead of generating. Accepts an optional integer for the max number of results (default: 5).
 
 To query the repository for similar existing ideas (skip generation):
 
