@@ -9,9 +9,6 @@ from dataclasses import asdict
 from sentence_transformers import SentenceTransformer
 from sklearn.metrics.pairwise import cosine_similarity
 
-# Re-using these dataclasses - ideally they would be in a shared models.py
-# For now, I will import them from idea_metabolism if needed, or redefine them if I want to decouple.
-# To avoid circular imports, I'll assume they will be moved or I'll just use dictionaries for internal node attrs.
 
 class GraphRepository:
     """
@@ -66,7 +63,7 @@ class GraphRepository:
         
         # Ensure embedding exists
         if 'embedding' not in idea_data or idea_data['embedding'] is None:
-             idea_data['embedding'] = self.embedding_model.encode(idea_data['content']).tolist()
+            idea_data['embedding'] = self.embedding_model.encode(idea_data['content']).tolist()
 
         if not self.graph.has_node(idea_id):
             # Store idea attributes. NetworkX supports arbitrary attrs.
@@ -77,60 +74,70 @@ class GraphRepository:
             )
             self.graph.add_edge(idea_id, problem_id, relation="ADDRESSES")
 
-    def get_top_ideas(self, n: int = 10, metric: str = "overall_interest", problem_filter: Optional[str] = None) -> List[tuple]:
-         """Get top N ideas by specified metric, optionally filtered by problem"""
-         # 1. Identify candidate ideas
-         candidate_ids = []
-         
-         if problem_filter:
-             # Find the problem ID for this text (fuzzy or exact)
-             # For this strict filter, we might want exact alignment or lookup
-             # Let's try to find the exact problem node first
-             target_prob_id = None
-             for node, data in self.graph.nodes(data=True):
-                 if data.get('type') == 'problem' and data.get('text') == problem_filter:
-                     target_prob_id = node
-                     break
-             
-             if target_prob_id:
-                 # Get ideas connected to this problem
-                 candidate_ids = [n for n in self.graph.predecessors(target_prob_id) if self.graph.nodes[n].get('type') == 'idea']
-             else:
-                 # Problem not found, return empty
-                 return []
-         else:
-             # All ideas
-             candidate_ids = [n for n, d in self.graph.nodes(data=True) if d.get('type') == 'idea']
-             
-         scored_ideas = []
-         for idea_id in candidate_ids:
-             data = self.graph.nodes[idea_id]
-             
-             # Reconstruct Idea object for compatibility
-             # Note: Idea constructor requires many fields, we stored them in node attrs
-             # We can just return a namedtuple or object that mimics Idea, or import Idea
-             # For now, let's create a simple object proxy
-             class IdeaProxy:
-                 def __init__(self, **kwargs):
-                     self.__dict__.update(kwargs)
-                     self.id = kwargs.get('id')
-                     self.content = kwargs.get('content')
-                     self.persona = kwargs.get('persona')
-                     self.problem_context = kwargs.get('problem_context')
-                     
-             idea_obj = IdeaProxy(**data)
-             
-             evals = data.get('evaluations', [])
-             if evals:
-                 # Metric lookup
-                 # evaluations is list of dicts
-                 scores = [e.get(f"{metric}_score" if metric != "overall_interest" else "overall_interest", 0.5) 
-                          for e in evals]
-                 avg_score = np.mean(scores)
-                 scored_ideas.append((idea_obj, avg_score))
+    def get_top_ideas(
+            self,
+            n: int = 10,
+            metric: str = "overall_interest",
+            problem_filter: Optional[str] = None
+    ) -> List[tuple]:
+        """Get top N ideas by specified metric, optionally filtered by problem"""
+        # 1. Identify candidate ideas
+        candidate_ids = []
+        
+        if problem_filter:
+            # Find the problem ID for this text (fuzzy or exact)
+            # For this strict filter, we might want exact alignment or lookup
+            # Let's try to find the exact problem node first
+            target_prob_id = None
+            for node, data in self.graph.nodes(data=True):
+                if data.get('type') == 'problem' and data.get('text') == problem_filter:
+                    target_prob_id = node
+                    break
+            
+            if target_prob_id:
+                # Get ideas connected to this problem
+                candidate_ids = [
+                    n for n in self.graph.predecessors(target_prob_id)
+                    if self.graph.nodes[n].get('type') == 'idea'
+                ]
+            else:
+                # Problem not found, return empty
+                return []
+        else:
+            # All ideas
+            candidate_ids = [n for n, d in self.graph.nodes(data=True) if d.get('type') == 'idea']
+            
+        scored_ideas = []
+        for idea_id in candidate_ids:
+            data = self.graph.nodes[idea_id]
+            
+            # Reconstruct Idea object for compatibility
+            # Note: Idea constructor requires many fields, we stored them in node attrs
+            # We can just return a namedtuple or object that mimics Idea, or import Idea
+            # For now, let's create a simple object proxy
+            class IdeaProxy:
+                def __init__(self, **kwargs):
+                    self.__dict__.update(kwargs)
+                    self.id = kwargs.get('id')
+                    self.content = kwargs.get('content')
+                    self.persona = kwargs.get('persona')
+                    self.problem_context = kwargs.get('problem_context')
+                    
+            idea_obj = IdeaProxy(**data)
+            
+            evals = data.get('evaluations', [])
+            if evals:
+                # Metric lookup
+                # evaluations is list of dicts
+                scores = [
+                    e.get(f"{metric}_score" if metric != "overall_interest" else "overall_interest", 0.5)
+                    for e in evals
+                ]
+                avg_score = np.mean(scores)
+                scored_ideas.append((idea_obj, avg_score))
 
-         scored_ideas.sort(key=lambda x: x[1], reverse=True)
-         return scored_ideas[:n]
+        scored_ideas.sort(key=lambda x: x[1], reverse=True)
+        return scored_ideas[:n]
 
     def add_evaluation(self, evaluation: Any):
         """Add an evaluation to an idea node"""
@@ -155,10 +162,11 @@ class GraphRepository:
         """Get evaluations for an idea"""
         if self.graph.has_node(idea_id):
             evals = self.graph.nodes[idea_id].get('evaluations', [])
+
             # Return as simple objects with attributes matching Evaluation class
             class EvalProxy:
                 def __init__(self, **kwargs):
-                   self.__dict__.update(kwargs)
+                    self.__dict__.update(kwargs)
             return [EvalProxy(**e) for e in evals]
         return []
 
@@ -197,7 +205,7 @@ class GraphRepository:
         # Always include the exact match if it exists (threshold might miss it if logic is fuzzy)
         # We assume find_similar_problems handles the semantics.
         
-        similar_problem_ids = self.find_similar_problems(problem_text, threshold=0.6) # Lower threshold for context
+        similar_problem_ids = self.find_similar_problems(problem_text, threshold=0.6)  # Lower threshold for context
         
         context_ideas = []
         seen_ids = set()
@@ -263,7 +271,12 @@ class GraphRepository:
                     self.add_evaluation(ev)
             
         self.save()
-        print(f"Migration complete. Graph has {self.graph.number_of_nodes()} nodes and {self.graph.number_of_edges()} edges.")
+        print(
+            f"Migration complete. "
+            f"Graph has {self.graph.number_of_nodes()} nodes "
+            f"and {self.graph.number_of_edges()} edges."
+        )
+
 
 if __name__ == "__main__":
     # Test/Migration script

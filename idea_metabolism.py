@@ -38,6 +38,7 @@ from graph_repository import GraphRepository
 logger = logging.getLogger("IdeaMetabolism")
 logger.setLevel(logging.INFO)
 
+
 class LogBufferHandler(logging.Handler):
     """Custom handler to capture logs in a string buffer"""
     def __init__(self, buffer_list):
@@ -47,6 +48,7 @@ class LogBufferHandler(logging.Handler):
     def emit(self, record):
         msg = self.format(record)
         self.buffer.append(msg)
+
 
 def setup_logging(capture_logs: bool = False) -> Optional[List[str]]:
     """Configure logging to stdout or buffer"""
@@ -65,6 +67,7 @@ def setup_logging(capture_logs: bool = False) -> Optional[List[str]]:
         handler.setFormatter(logging.Formatter('%(message)s'))
         logger.addHandler(handler)
         return None
+
 
 # Replace with your preferred LLM
 # Load environment variables
@@ -245,7 +248,9 @@ Format as JSON array:
         # Create Idea objects
         result = []
         for i, idea_data in enumerate(ideas_data[:num_ideas]):
-            idea_text = f"{idea_data.get('idea', '')}\n\nRationale: {idea_data.get('rationale', '')}\nAssumptions: {idea_data.get('assumptions', '')}"
+            idea_text = f"{idea_data.get('idea', '')}\n\n" \
+                        f"Rationale: {idea_data.get('rationale', '')}\n" \
+                        f"Assumptions: {idea_data.get('assumptions', '')}"
             
             idea = Idea(
                 id=f"{self.persona_type}_{int(time.time())}_{i}",
@@ -375,7 +380,12 @@ class IdeaRepository:
         if evaluation.idea_id in self.evaluations:
             self.evaluations[evaluation.idea_id].append(evaluation)
     
-    def get_top_ideas(self, n: int = 10, metric: str = "overall_interest", problem_filter: Optional[str] = None) -> List[tuple]:
+    def get_top_ideas(
+            self,
+            n: int = 10,
+            metric: str = "overall_interest",
+            problem_filter: Optional[str] = None
+    ) -> List[tuple]:
         """Get top N ideas by specified metric, optionally filtered by problem"""
         
         scored_ideas = []
@@ -387,8 +397,10 @@ class IdeaRepository:
             evals = self.evaluations.get(idea_id, [])
             if evals:
                 # Average score across evaluations
-                scores = [getattr(e, f"{metric}_score" if metric != "overall_interest" else "overall_interest") 
-                         for e in evals]
+                scores = [
+                    getattr(e, f"{metric}_score" if metric != "overall_interest" else "overall_interest")
+                    for e in evals
+                ]
                 avg_score = np.mean(scores)
                 scored_ideas.append((idea, avg_score))
         
@@ -476,20 +488,20 @@ class IdeaMetabolismSystem:
         # We create a temporary Idea class or simple object
         existing_ideas = []
         for d in context_dicts:
-             # Basic reconstruction
-             try:
-                 obj = Idea(
-                     id=d['id'],
-                     content=d.get('content',''),
-                     persona=d.get('persona',''),
-                     temperature=d.get('temperature',0.7),
-                     timestamp=d.get('timestamp',''),
-                     problem_context=d.get('problem_context',''),
-                     embedding=d.get('embedding')
-                 )
-                 existing_ideas.append(obj)
-             except:
-                 pass
+            # Basic reconstruction
+            try:
+                obj = Idea(
+                    id=d['id'],
+                    content=d.get('content', ''),
+                    persona=d.get('persona', ''),
+                    temperature=d.get('temperature', 0.7),
+                    timestamp=d.get('timestamp', ''),
+                    problem_context=d.get('problem_context', ''),
+                    embedding=d.get('embedding')
+                )
+                existing_ideas.append(obj)
+            except:
+                pass
         
         for idea in ideas:
             logger.info(f"Evaluating idea {idea.id[:20]}...")
@@ -576,19 +588,19 @@ If no relationships, return []."""
         
         historical_ideas = []
         for d in context_dicts:
-             try:
-                 obj = Idea(
-                     id=d['id'],
-                     content=d.get('content',''),
-                     persona=d.get('persona',''),
-                     temperature=d.get('temperature',0.7),
-                     timestamp=d.get('timestamp',''),
-                     problem_context=d.get('problem_context',''),
-                     embedding=d.get('embedding')
-                 )
-                 historical_ideas.append(obj)
-             except:
-                 pass
+            try:
+                obj = Idea(
+                    id=d['id'],
+                    content=d.get('content', ''),
+                    persona=d.get('persona', ''),
+                    temperature=d.get('temperature', 0.7),
+                    timestamp=d.get('timestamp', ''),
+                    problem_context=d.get('problem_context', ''),
+                    embedding=d.get('embedding')
+                )
+                historical_ideas.append(obj)
+            except:
+                pass
 
         # Combine candidates (ensure uniqueness by ID)
         all_candidates = {idea.id: idea for idea in ideas}
@@ -645,7 +657,8 @@ PARENT B (High Feasibility):
 
 PROBLEM: {parent_a.problem_context}
 
-TASK: Generate a "Child Idea" that combines the core novel mechanism of Parent A with the practical grounding of Parent B.
+TASK: Generate a "Child Idea" that combines the core novel mechanism of Parent A 
+with the practical grounding of Parent B.
 The child should be a distinct concept, not just a concatenation. 
 Mutate the idea slightly to ensure it evolves beyond both parents.
 
@@ -663,7 +676,9 @@ Format as JSON:
             end = response.rfind('}') + 1
             child_data = json.loads(response[start:end])
             
-            child_text = f"{child_data.get('idea', '')}\n\nRationale: {child_data.get('rationale', '')}\nAssumptions: {child_data.get('assumptions', '')}"
+            child_text = f"{child_data.get('idea', '')}\n\n" \
+                         f"Rationale: {child_data.get('rationale', '')}\n" \
+                         f"Assumptions: {child_data.get('assumptions', '')}"
             
             # 3. Integration
             child_id = f"child_{int(time.time())}"
@@ -680,7 +695,8 @@ Format as JSON:
             # Embed and Add
             child_idea.embedding = self.llm.get_embedding(child_idea.content)
             
-            # Register with graph (using existing problem ID lookup would be better, but we can pass text logic in add_idea or similar)
+            # Register with graph (using existing problem ID lookup would be better,
+            # but we can pass text logic in add_idea or similar)
             # We need the problem ID. 
             # Currently add_idea takes idea and problem_id.
             # We can re-fetch or track problem_id.
@@ -705,7 +721,7 @@ Format as JSON:
             # Ideally we check against broader context.
             context_dicts = self.repository.get_context_ideas(child_idea.problem_context)
             # Reconstruct... (This logic is duplicated, suggests need for helper)
-            existing_for_eval = [] # ... skipped for brevity, let's use the 'ideas' batch + parents
+            existing_for_eval = []  # ... skipped for brevity, let's use the 'ideas' batch + parents
             existing_for_eval.extend(ideas)
             
             evaluation = self.evaluator.evaluate_idea(child_idea, existing_for_eval)
@@ -784,19 +800,19 @@ Format as JSON:
             # Convert to objects
             found_ideas = []
             for d in context_dicts:
-                 try:
-                     obj = Idea(
-                         id=d['id'],
-                         content=d.get('content',''),
-                         persona=d.get('persona',''),
-                         temperature=d.get('temperature',0.7),
-                         timestamp=d.get('timestamp',''),
-                         problem_context=d.get('problem_context',''),
-                         embedding=d.get('embedding')
-                     )
-                     found_ideas.append(obj)
-                 except:
-                     pass
+                try:
+                    obj = Idea(
+                        id=d['id'],
+                        content=d.get('content', ''),
+                        persona=d.get('persona', ''),
+                        temperature=d.get('temperature', 0.7),
+                        timestamp=d.get('timestamp', ''),
+                        problem_context=d.get('problem_context', ''),
+                        embedding=d.get('embedding')
+                    )
+                    found_ideas.append(obj)
+                except:
+                    pass
             
             # Formatting results
             for i, idea in enumerate(found_ideas):
@@ -883,11 +899,11 @@ if __name__ == "__main__":
         print(f"Found {len(results)} relevant ideas in context.\n")
         
         for i, res in enumerate(results, 1):
-             print(f"{i}. [{res['persona'].upper()}] Score: {res['score']:.2f}")
-             print(f"   {res['content'][:200]}...")
-             if res['reasoning']:
-                 print(f"   Reasoning: {res['reasoning'][:150]}...")
-             print()
+            print(f"{i}. [{res['persona'].upper()}] Score: {res['score']:.2f}")
+            print(f"   {res['content'][:200]}...")
+            if res['reasoning']:
+                print(f"   Reasoning: {res['reasoning'][:150]}...")
+            print()
     else:
         # Standard run prints its own output via display_top_ideas inside run()
         # We can just call process_problem to exercise that path if we want, 

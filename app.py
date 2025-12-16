@@ -8,9 +8,11 @@ app = Flask(__name__)
 # In production, this might need better management, but for POC it's fine.
 system = IdeaMetabolismSystem(llm_provider="anthropic")
 
+
 @app.route('/')
 def home():
     return render_template('index.html')
+
 
 @app.route('/api/process', methods=['POST'])
 def process():
@@ -35,6 +37,7 @@ def process():
     except Exception as e:
         print(f"Error processing: {e}")
         return jsonify({"error": str(e)}), 500
+
 
 if __name__ == '__main__':
     app.run(debug=True, host='0.0.0.0', port=5000)
