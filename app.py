@@ -1,6 +1,6 @@
 import os
 from flask import Flask, render_template, request, jsonify
-from idea_metabolism import IdeaMetabolismSystem
+from idea_metabolism import IdeaMetabolismSystem, setup_logging
 
 app = Flask(__name__)
 
@@ -24,8 +24,14 @@ def process():
         return jsonify({"error": "Problem statement required"}), 400
     
     try:
+        # Capture logs for this request
+        log_buffer = setup_logging(capture_logs=True)
+        
         results = system.process_problem(problem, repo_only=repo_only, limit=limit, ideas_per_persona=ideas_per_persona)
-        return jsonify({"results": results})
+        return jsonify({
+            "results": results,
+            "logs": log_buffer
+        })
     except Exception as e:
         print(f"Error processing: {e}")
         return jsonify({"error": str(e)}), 500

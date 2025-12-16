@@ -13,11 +13,18 @@ Requirements:
 """
 
 import os
+
+# Suppress tokenizer parallelism warning before importing transformers
+os.environ["TOKENIZERS_PARALLELISM"] = "false"
+
 import json
 import time
 import argparse
 import sys
+import logging
+import io
 from dotenv import load_dotenv
+
 from dataclasses import dataclass, asdict
 from typing import List, Dict, Optional, Literal
 from datetime import datetime
@@ -26,6 +33,38 @@ from sklearn.metrics.pairwise import cosine_similarity
 from sentence_transformers import SentenceTransformer
 from graph_repository import GraphRepository
 
+
+# Initialize Logger
+logger = logging.getLogger("IdeaMetabolism")
+logger.setLevel(logging.INFO)
+
+class LogBufferHandler(logging.Handler):
+    """Custom handler to capture logs in a string buffer"""
+    def __init__(self, buffer_list):
+        super().__init__()
+        self.buffer = buffer_list
+        
+    def emit(self, record):
+        msg = self.format(record)
+        self.buffer.append(msg)
+
+def setup_logging(capture_logs: bool = False) -> Optional[List[str]]:
+    """Configure logging to stdout or buffer"""
+    # Clear existing handlers
+    logger.handlers = []
+    
+    if capture_logs:
+        log_buffer = []
+        handler = LogBufferHandler(log_buffer)
+        handler.setFormatter(logging.Formatter('%(message)s'))
+        logger.addHandler(handler)
+        return log_buffer
+    else:
+        # CLI Mode
+        handler = logging.StreamHandler(sys.stdout)
+        handler.setFormatter(logging.Formatter('%(message)s'))
+        logger.addHandler(handler)
+        return None
 
 # Replace with your preferred LLM
 # Load environment variables
@@ -395,14 +434,14 @@ class IdeaMetabolismSystem:
     def run_generation_cycle(self, problem: str, ideas_per_persona: int = 3):
         """Run Stage 1: Generate ideas from all personas"""
         
-        print(f"\n{'='*60}")
-        print("STAGE 1: IDEA GENERATION")
-        print(f"{'='*60}\n")
+        logger.info(f"\n{'='*60}")
+        logger.info("STAGE 1: IDEA GENERATION")
+        logger.info(f"{'='*60}\n")
         
         all_ideas = []
         
         for persona_type, agent in self.agents.items():
-            print(f"Generating ideas from {agent.config['name']}...")
+            logger.info(f"Generating ideas from {agent.config['name']}...")
             ideas = agent.generate_ideas(problem, ideas_per_persona)
             
             # Register problem in graph
@@ -414,16 +453,16 @@ class IdeaMetabolismSystem:
                 self.repository.add_idea(idea, problem_id)
             
             all_ideas.extend(ideas)
-            print(f"  Generated {len(ideas)} ideas\n")
+            logger.info(f"  Generated {len(ideas)} ideas\n")
         
         return all_ideas
     
     def run_triage_cycle(self, ideas: List[Idea]):
         """Run Stage 2: Evaluate and triage ideas"""
         
-        print(f"\n{'='*60}")
-        print("STAGE 2: TRIAGE & EVALUATION (Graph RAG)")
-        print(f"{'='*60}\n")
+        logger.info(f"\n{'='*60}")
+        logger.info("STAGE 2: TRIAGE & EVALUATION (Graph RAG)")
+        logger.info(f"{'='*60}\n")
         
         # RAG: Retrieve context ideas based on current ideas' problem
         # We assume all new ideas share the same problem context for now
@@ -453,14 +492,14 @@ class IdeaMetabolismSystem:
                  pass
         
         for idea in ideas:
-            print(f"Evaluating idea {idea.id[:20]}...")
+            logger.info(f"Evaluating idea {idea.id[:20]}...")
             evaluation = self.evaluator.evaluate_idea(idea, existing_ideas)
             self.repository.add_evaluation(evaluation)
             
-            print(f"  Novelty: {evaluation.novelty_score:.2f}")
-            print(f"  Feasibility: {evaluation.feasibility_score:.2f}")
-            print(f"  Surprise: {evaluation.surprise_score:.2f}")
-            print(f"  Interest: {evaluation.overall_interest:.2f}\n")
+            logger.info(f"  Novelty: {evaluation.novelty_score:.2f}")
+            logger.info(f"  Feasibility: {evaluation.feasibility_score:.2f}")
+            logger.info(f"  Surprise: {evaluation.surprise_score:.2f}")
+            logger.info(f"  Interest: {evaluation.overall_interest:.2f}\n")
             
         # Extract relationships (NEW)
         self.extract_relationships(ideas, existing_ideas)
@@ -469,9 +508,9 @@ class IdeaMetabolismSystem:
 
     def extract_relationships(self, new_ideas: List[Idea], existing_ideas: List[Idea]):
         """Stage 3: Extract semantic relationships between ideas"""
-        print(f"\n{'='*60}")
-        print("STAGE 3: RELATIONSHIP EXTRACTION")
-        print(f"{'='*60}\n")
+        logger.info(f"\n{'='*60}")
+        logger.info("STAGE 3: RELATIONSHIP EXTRACTION")
+        logger.info(f"{'='*60}\n")
         
         if not existing_ideas:
             return
@@ -516,15 +555,15 @@ If no relationships, return []."""
                     
                     if target_id and rel_type in ["CONTRADICTS", "REQUIRES"]:
                         self.repository.add_relationship(idea.id, target_id, rel_type, reason)
-                        print(f"  [RELATIONSHIP] {rel_type}: {reason[:100]}...")
+                        logger.info(f"  [RELATIONSHIP] {rel_type}: {reason[:100]}...")
             except:
                 pass
 
     def run_evolution_cycle(self, ideas: List[Idea]):
         """Stage 4: Evolutionary Synthesis (Breeding)"""
-        print(f"\n{'='*60}")
-        print("STAGE 4: EVOLUTIONARY SYNTHESIS")
-        print(f"{'='*60}\n")
+        logger.info(f"\n{'='*60}")
+        logger.info("STAGE 4: EVOLUTIONARY SYNTHESIS")
+        logger.info(f"{'='*60}\n")
         
         if not ideas:
             return
@@ -558,7 +597,7 @@ If no relationships, return []."""
                 all_candidates[h_idea.id] = h_idea
         
         candidate_list = list(all_candidates.values())
-        print(f"Breeding Pool Size: {len(candidate_list)} ideas (Current + History)")
+        logger.info(f"Breeding Pool Size: {len(candidate_list)} ideas (Current + History)")
 
         # We need the evaluations for these ideas
         scored_candidates = []
@@ -574,7 +613,7 @@ If no relationships, return []."""
                 })
         
         if len(scored_candidates) < 2:
-            print("Not enough evaluated ideas for breeding.")
+            logger.info("Not enough evaluated ideas for breeding.")
             return
 
         # Select Parent A (Most Novel)
@@ -589,8 +628,8 @@ If no relationships, return []."""
         parent_b_data = max(remaining, key=lambda x: x['feasibility'])
         parent_b = parent_b_data['idea']
         
-        print(f"Parent A (Novelty {parent_a_data['novelty']:.2f}): {parent_a.content[:50]}...")
-        print(f"Parent B (Feasibility {parent_b_data['feasibility']:.2f}): {parent_b.content[:50]}...")
+        logger.info(f"Parent A (Novelty {parent_a_data['novelty']:.2f}): {parent_a.content[:50]}...")
+        logger.info(f"Parent B (Feasibility {parent_b_data['feasibility']:.2f}): {parent_b.content[:50]}...")
         
         # 2. Crossover & Mutation
         prompt = f"""Perform an evolutionary synthesis of two ideas.
@@ -649,14 +688,14 @@ Format as JSON:
             problem_id = self.repository.add_problem(child_idea.problem_context)
             
             self.repository.add_idea(child_idea, problem_id)
-            print(f"\nCreated Child Idea: {child_idea.content[:100]}...")
+            logger.info(f"\nCreated Child Idea: {child_idea.content[:100]}...")
             
             # Add Lineage Edges
             self.repository.add_relationship(child_id, parent_a.id, "DERIVED_FROM", "Novelty Parent")
             self.repository.add_relationship(child_id, parent_b.id, "DERIVED_FROM", "Feasibility Parent")
             
             # Evaluate Child
-            print("Evaluating Child...")
+            logger.info("Evaluating Child...")
             # We need existing ideas list again.
             # We can pass the full graph context or just the current batch + parents
             # Let's retrieve context again or use 'ideas' list which is the batch
@@ -669,14 +708,14 @@ Format as JSON:
             evaluation = self.evaluator.evaluate_idea(child_idea, existing_for_eval)
             self.repository.add_evaluation(evaluation)
             
-            print(f"  Novelty: {evaluation.novelty_score:.2f}")
-            print(f"  Feasibility: {evaluation.feasibility_score:.2f}")
-            print(f"  Interest: {evaluation.overall_interest:.2f}\n")
+            logger.info(f"  Novelty: {evaluation.novelty_score:.2f}")
+            logger.info(f"  Feasibility: {evaluation.feasibility_score:.2f}")
+            logger.info(f"  Interest: {evaluation.overall_interest:.2f}\n")
             
         except json.JSONDecodeError:
-            print("Failed to generate valid JSON for child idea.")
+            logger.error("Failed to generate valid JSON for child idea.")
         except Exception as e:
-            print(f"Error during evolution: {e}")
+            logger.error(f"Error during evolution: {e}")
     
     def display_top_ideas(self, n: int = 5, problem: Optional[str] = None):
         """Display top N ideas by overall interest"""
@@ -686,6 +725,8 @@ Format as JSON:
         if problem:
             print(f"For problem: {problem}")
         print(f"{'='*60}\n")
+        
+        # NOTE: KEEPING PRINTS HERE AS THIS IS FINAL OUTPUT DISPLAY, NOT LOGGING
         
         top_ideas = self.repository.get_top_ideas(n, problem_filter=problem)
         
@@ -699,10 +740,10 @@ Format as JSON:
                 print(f"   Reasoning: {eval_summary.reasoning[:150]}...")
             print()
     
-    def run(self, problem: str, ideas_per_persona: int = 1):
+    def run(self, problem: str, ideas_per_persona: int = 1, display_results: bool = True):
         """Run complete generation and triage cycle"""
         
-        print(f"\nPROBLEM: {problem}\n")
+        logger.info(f"\nPROBLEM: {problem}\n")
         
         # Stage 1: Generate
         ideas = self.run_generation_cycle(problem, ideas_per_persona)
@@ -714,13 +755,12 @@ Format as JSON:
         self.run_evolution_cycle(ideas)
         
         # Display results
-        self.display_top_ideas(problem=problem)
+        if display_results:
+            self.display_top_ideas(problem=problem)
         
-        print(f"\nRepository saved to: {self.repository.filepath}")
-        print(f"Total ideas in repository: {self.repository.count_ideas()}")
+        logger.info(f"\nRepository saved to: {self.repository.filepath}")
+        logger.info(f"Total ideas in repository: {self.repository.count_ideas()}")
 
-
-    
     def process_problem(self, problem: str, repo_only: bool = False, limit: int = 5, ideas_per_persona: int = 1) -> List[Dict]:
         """Process a problem statement and return structured results"""
         
@@ -773,7 +813,7 @@ Format as JSON:
             # Generation Mode
             # Run the full pipeline
             # Suppress stdout to keep API clean? Or just let it print to server logs.
-            self.run(problem, ideas_per_persona=ideas_per_persona)
+            self.run(problem, ideas_per_persona=ideas_per_persona, display_results=False)
             
             # Retrieve top results
             top_ideas = self.repository.get_top_ideas(limit, problem_filter=problem)
@@ -795,6 +835,7 @@ Format as JSON:
                 
         return results
 
+
 # Example usage
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Idea Metabolism System")
@@ -805,6 +846,9 @@ if __name__ == "__main__":
                         help="Number of ideas to generate per persona (default 1)")
     
     args = parser.parse_args()
+    
+    # CLI Logging Setup
+    setup_logging(capture_logs=False)
     
     if not args.problem:
         parser.print_help()
