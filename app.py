@@ -18,16 +18,17 @@ def process():
     problem = data.get('problem')
     repo_only = data.get('repoOnly', False)
     limit = int(data.get('limit', 5))
+    ideas_per_persona = int(data.get('ideasPerPersona', 1))
     
     if not problem:
         return jsonify({"error": "Problem statement required"}), 400
     
     try:
-        results = system.process_problem(problem, repo_only=repo_only, limit=limit)
+        results = system.process_problem(problem, repo_only=repo_only, limit=limit, ideas_per_persona=ideas_per_persona)
         return jsonify({"results": results})
     except Exception as e:
         print(f"Error processing: {e}")
         return jsonify({"error": str(e)}), 500
 
 if __name__ == '__main__':
-    app.run(debug=True, port=5000)
+    app.run(debug=True, host='0.0.0.0', port=5000)

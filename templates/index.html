@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -59,13 +60,15 @@
             font-weight: 500;
         }
 
-        input[type="text"], input[type="number"] {
+        input[type="text"],
+        input[type="number"] {
             width: 100%;
             padding: 10px;
             border: 1px solid var(--border);
             border-radius: 6px;
             font-size: 1rem;
-            box-sizing: border-box; /* Fixes padding issue */
+            box-sizing: border-box;
+            /* Fixes padding issue */
             margin-bottom: 1rem;
         }
 
@@ -88,10 +91,11 @@
         }
 
         .limit-input {
-            display: none; /* Hidden by default */
+            display: none;
+            /* Hidden by default */
             flex: 1;
         }
-        
+
         .limit-input.active {
             display: block;
         }
@@ -112,7 +116,7 @@
         button:hover {
             background-color: var(--primary-hover);
         }
-        
+
         button:disabled {
             background-color: #94a3b8;
             cursor: not-allowed;
@@ -129,13 +133,13 @@
             padding: 1.5rem;
             border-radius: 12px;
             border: 1px solid var(--border);
-            box-shadow: 0 2px 4px rgba(0,0,0,0.02);
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.02);
             transition: transform 0.2s;
         }
-        
+
         .card:hover {
             transform: translateY(-2px);
-            box-shadow: 0 4px 6px rgba(0,0,0,0.05);
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05);
         }
 
         .card-header {
@@ -174,29 +178,30 @@
             border-radius: 6px;
             border-left: 3px solid var(--primary);
         }
-        
+
         .loading {
             text-align: center;
             color: var(--text-secondary);
             display: none;
             margin: 2rem 0;
         }
-        
+
         .source-tag {
             font-size: 0.75rem;
             color: #64748b;
             margin-left: 10px;
         }
-
     </style>
 </head>
+
 <body>
     <div class="container">
         <header>
             <h1>Idea Metabolism</h1>
             <p class="intro">
-                A system where ideas are not just generated once but are stored, retrieved, and critiqued in a persistent knowledge graph.
-                Breeds new ideas from the best of the past.
+                A system where ideas are not just generated once but are stored, retrieved, and critiqued in a
+                persistent knowledge graph, generating ideas from diverse personas, and breeding new ideas
+                from the best of the past to enhance interestingness for creative problem solving.
             </p>
         </header>
 
@@ -208,16 +213,20 @@
                 <input type="checkbox" id="repoOnly" onchange="toggleLimit()">
                 <label for="repoOnly" style="margin:0; cursor:pointer;">Search Repository Only</label>
             </div>
-            
-            <div id="limitContainer" class="limit-input">
-                 <!-- Hidden by default, shown via JS -->
-                 <label for="limit" style="font-size:0.9rem">Max Ideas to Retrieve</label>
-                 <input type="number" id="limit" value="5" min="1" max="20">
+
+            <div id="repoOnlyOptions" class="limit-input">
+                <label for="limit" style="font-size:0.9rem">Max Ideas to Retrieve</label>
+                <input type="number" id="limit" value="5" min="1" max="20">
+            </div>
+
+            <div id="generationOptions" class="generation-input">
+                <label for="ideasPerPersona" style="font-size:0.9rem">Ideas per Persona</label>
+                <input type="number" id="ideasPerPersona" value="1" min="1" max="5">
             </div>
 
             <button onclick="processIdea()" id="submitBtn">Generate / Search</button>
         </div>
-        
+
         <div id="loading" class="loading">
             Processing... This may take a moment.
         </div>
@@ -230,18 +239,26 @@
     <script>
         function toggleLimit() {
             const isChecked = document.getElementById('repoOnly').checked;
-            const container = document.getElementById('limitContainer');
+            const repoOptions = document.getElementById('repoOnlyOptions');
+            const genOptions = document.getElementById('generationOptions');
+
             if (isChecked) {
-                container.classList.add('active');
+                repoOptions.style.display = 'block';
+                genOptions.style.display = 'none';
             } else {
-                container.classList.remove('active');
+                repoOptions.style.display = 'none';
+                genOptions.style.display = 'block';
             }
         }
+
+        // Initialize state
+        window.onload = toggleLimit;
 
         async function processIdea() {
             const problem = document.getElementById('problem').value;
             const repoOnly = document.getElementById('repoOnly').checked;
             const limit = document.getElementById('limit').value;
+            const ideasPerPersona = document.getElementById('ideasPerPersona').value;
             const btn = document.getElementById('submitBtn');
             const loading = document.getElementById('loading');
             const resultsDiv = document.getElementById('results');
@@ -260,15 +277,16 @@
                 const response = await fetch('/api/process', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ 
-                        problem: problem, 
-                        repoOnly: repoOnly, 
-                        limit: limit 
+                    body: JSON.stringify({
+                        problem: problem,
+                        repoOnly: repoOnly,
+                        limit: limit,
+                        ideasPerPersona: ideasPerPersona
                     })
                 });
-                
+
                 const data = await response.json();
-                
+
                 if (data.error) {
                     resultsDiv.innerHTML = `<p style="color:red">Error: ${data.error}</p>`;
                 } else {
@@ -285,7 +303,7 @@
 
         function renderResults(ideas) {
             const container = document.getElementById('results');
-            
+
             if (ideas.length === 0) {
                 container.innerHTML = "<p style='text-align:center; color:#64748b'>No results found.</p>";
                 return;
@@ -304,9 +322,10 @@
                     ${idea.reasoning ? `<div class="reasoning"><strong>Evaluation:</strong> ${idea.reasoning}</div>` : ''}
                 </div>
             `).join('');
-            
+
             container.innerHTML = html;
         }
     </script>
 </body>
+
 </html>

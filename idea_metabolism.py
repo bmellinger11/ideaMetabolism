@@ -699,7 +699,7 @@ Format as JSON:
                 print(f"   Reasoning: {eval_summary.reasoning[:150]}...")
             print()
     
-    def run(self, problem: str, ideas_per_persona: int = 3):
+    def run(self, problem: str, ideas_per_persona: int = 1):
         """Run complete generation and triage cycle"""
         
         print(f"\nPROBLEM: {problem}\n")
@@ -721,7 +721,7 @@ Format as JSON:
 
 
     
-    def process_problem(self, problem: str, repo_only: bool = False, limit: int = 5) -> List[Dict]:
+    def process_problem(self, problem: str, repo_only: bool = False, limit: int = 5, ideas_per_persona: int = 1) -> List[Dict]:
         """Process a problem statement and return structured results"""
         
         results = []
@@ -773,7 +773,7 @@ Format as JSON:
             # Generation Mode
             # Run the full pipeline
             # Suppress stdout to keep API clean? Or just let it print to server logs.
-            self.run(problem, ideas_per_persona=3)
+            self.run(problem, ideas_per_persona=ideas_per_persona)
             
             # Retrieve top results
             top_ideas = self.repository.get_top_ideas(limit, problem_filter=problem)
@@ -801,6 +801,8 @@ if __name__ == "__main__":
     parser.add_argument("-p", "--problem", type=str, help="The problem statement to address")
     parser.add_argument("-r", "--repo-only", nargs="?", const=5, type=int, 
                         help="Only query repository for existing ideas related to problem (default 5 results)")
+    parser.add_argument("-n", "--ideas-per-persona", type=int, default=1, 
+                        help="Number of ideas to generate per persona (default 1)")
     
     args = parser.parse_args()
     
@@ -838,4 +840,4 @@ if __name__ == "__main__":
         # or stick to system.run() which is what process_problem calls.
         # To ensure process_problem is 'the' API, let's use it, but ignored return for CLI output 
         # since run() prints everything.
-        system.process_problem(problem, repo_only=False)
+        system.process_problem(problem, repo_only=False, ideas_per_persona=args.ideas_per_persona)

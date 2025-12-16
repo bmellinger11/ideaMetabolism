@@ -60,8 +60,12 @@ To generate ideas for a specific problem:
 ```bash
 python idea_metabolism.py --problem "How to reduce plastic waste in oceans?"
 # OR
-python idea_metabolism.py -p "How to reduce plastic waste in oceans?"
+python idea_metabolism.py -p "How to reduce plastic waste in oceans?" -n 2
 ```
+
+**Options:**
+*   `-p`, `--problem`: The problem statement (required).
+*   `-n`, `--ideas-per-persona`: Number of ideas to generate per persona (default: 1).
 
 To query the repository for similar existing ideas (skip generation):
 
@@ -73,8 +77,24 @@ python idea_metabolism.py -p "How to reduce plastic waste?" --repo-only
 python idea_metabolism.py -p "How to reduce plastic waste?" -r 3
 ```
 
+### Web Interface
+
+The system includes a Flask-based mobile-friendly web interface.
+
+1.  **Start the Server**:
+    ```bash
+    python app.py
+    ```
+    The server will start on `http://0.0.0.0:5000`.
+
+2.  **Access**:
+    Open your browser and navigate to `http://localhost:5000` (or your machine's IP address).
+
+    *   **Repo Only Checked**: Search existing ideas.
+    *   **Repo Only Unchecked**: Generate new ideas (configure "Ideas per Persona" to control volume).
+
 The system will:
-1.  Generate ~9 ideas from different personas.
+1.  Generate ~3 ideas from different personas (plus 1 synthesized from evolutionary cross-breeding).
 2.  Compare them against the graph history.
 3.  Output the Top 5 ideas with scores and reasoning.
 4.  Save the updated graph to `idea_graph.gml`.
