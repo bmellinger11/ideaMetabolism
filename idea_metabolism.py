@@ -74,6 +74,10 @@ def setup_logging(capture_logs: bool = False) -> Optional[List[str]]:
 load_dotenv()  # Load variables from .env into the environment
 if not os.environ.get("ANTHROPIC_API_KEY"):
     os.environ["ANTHROPIC_API_KEY"] = os.getenv("ANTHROPIC_API_KEY")
+# OPTIONAL: if not os.environ.get("OPENAI_API_KEY"):
+# OPTIONAL:     os.environ["OPENAI_API_KEY"] = os.getenv("OPENAI_API_KEY")
+# OPTIONAL: if not os.environ.get("GOOGLE_API_KEY"):
+# OPTIONAL:     os.environ["GOOGLE_API_KEY"] = os.getenv("GOOGLE_API_KEY")
 
 
 # LLM Client Setup
@@ -91,6 +95,8 @@ class LLMClient:
         elif provider == "openai":
             import openai
             self.client = openai.OpenAI(api_key=os.environ.get("OPENAI_API_KEY"))
+            # Initialize local embedding model for Anthropic
+            self.embedding_model = SentenceTransformer('all-MiniLM-L6-v2')
         elif provider == "gemini":
             import google.generativeai as genai
             genai.configure(api_key=os.environ.get("GOOGLE_API_KEY"))
@@ -129,16 +135,8 @@ class LLMClient:
     
     def get_embedding(self, text: str) -> List[float]:
         """Get embedding vector for text"""
-        
-        if self.provider == "openai":
-            response = self.client.embeddings.create(
-                model="text-embedding-3-small",
-                input=text
-            )
-            return response.data[0].embedding
-        else:
-            # Use local sentence-transformers model
-            return self.embedding_model.encode(text).tolist()
+        # Always use local sentence-transformers model for consistency across providers
+        return self.embedding_model.encode(text).tolist()
 
 
 @dataclass
@@ -884,6 +882,8 @@ if __name__ == "__main__":
     
     # Initialize system
     system = IdeaMetabolismSystem(llm_provider="anthropic")
+    # OPTIONAL: system = IdeaMetabolismSystem(llm_provider="openai")
+    # OPTIONAL: system = IdeaMetabolismSystem(llm_provider="gemini")
     
     # Run using the new API method logic for consistent behavior
     # Note: run() inside process_problem prints logs, which is fine for CLI.

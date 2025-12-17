@@ -7,6 +7,8 @@ app = Flask(__name__)
 # Initialize system globally
 # In production, this might need better management, but for POC it's fine.
 system = IdeaMetabolismSystem(llm_provider="anthropic")
+# OPTIONAL: system = IdeaMetabolismSystem(llm_provider="openai")
+# OPTIONAL: system = IdeaMetabolismSystem(llm_provider="gemini")
 
 
 @app.route('/')
