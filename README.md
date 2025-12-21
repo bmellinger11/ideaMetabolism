@@ -84,7 +84,7 @@ The system includes a Flask-based mobile-friendly web interface.
 
 1.  **Start the Server**:
     ```bash
-    python app.py
+    python application.py
     ```
     The server will start on `http://0.0.0.0:5000`.
 

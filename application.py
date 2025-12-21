@@ -2,7 +2,7 @@ import os
 from flask import Flask, render_template, request, jsonify
 from idea_metabolism import IdeaMetabolismSystem, setup_logging
 
-app = Flask(__name__)
+application = Flask(__name__)
 
 # Initialize system globally
 # In production, this might need better management, but for POC it's fine.
@@ -11,12 +11,12 @@ system = IdeaMetabolismSystem(llm_provider="anthropic")
 # OPTIONAL: system = IdeaMetabolismSystem(llm_provider="gemini")
 
 
-@app.route('/')
+@application.route('/')
 def home():
     return render_template('index.html')
 
 
-@app.route('/api/process', methods=['POST'])
+@application.route('/api/process', methods=['POST'])
 def process():
     data = request.json
     problem = data.get('problem')
@@ -42,4 +42,4 @@ def process():
 
 
 if __name__ == '__main__':
-    app.run(debug=True, host='0.0.0.0', port=5000)
+    application.run(debug=True, host='0.0.0.0', port=5000)
