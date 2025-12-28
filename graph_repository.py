@@ -201,11 +201,19 @@ class GraphRepository:
 
     def get_context_ideas(self, problem_text: str) -> List[Dict[str, Any]]:
         """Retrieve all ideas linked to problems similar to the input text"""
-        # 1. Find similar problems (RAG step 1)
-        # Always include the exact match if it exists (threshold might miss it if logic is fuzzy)
-        # We assume find_similar_problems handles the semantics.
+        # Step 1: Try exact text match first
+        exact_match_id = None
+        for node, data in self.graph.nodes(data=True):
+            if data.get('type') == 'problem' and data.get('text') == problem_text:
+                exact_match_id = node
+                break
         
-        similar_problem_ids = self.find_similar_problems(problem_text, threshold=0.6)  # Lower threshold for context
+        # Step 2: Semantic search with lower threshold for fuzzy matching
+        similar_problem_ids = self.find_similar_problems(problem_text, threshold=0.5)
+        
+        # Step 3: Ensure exact match is included if found (even if below semantic threshold)
+        if exact_match_id and exact_match_id not in similar_problem_ids:
+            similar_problem_ids.insert(0, exact_match_id)
         
         context_ideas = []
         seen_ids = set()
