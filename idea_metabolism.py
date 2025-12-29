@@ -813,16 +813,24 @@ Format as JSON:
                     pass
             
             # Formatting results
-            for i, idea in enumerate(found_ideas):
-                if i >= limit:
-                    break
-                
+            # First, score all ideas and collect data
+            scored_ideas = []
+            for idea in found_ideas:
                 score = 0
                 reasoning = ""
                 evals = self.repository.get_evaluations(idea.id)
                 if evals:
                     score = getattr(evals[0], 'overall_interest', 0)
                     reasoning = evals[0].reasoning
+                scored_ideas.append((idea, score, reasoning))
+            
+            # Sort by score descending (highest interest first)
+            scored_ideas.sort(key=lambda x: x[1], reverse=True)
+            
+            # Take top N and format
+            for i, (idea, score, reasoning) in enumerate(scored_ideas):
+                if i >= limit:
+                    break
                 
                 results.append({
                     "id": idea.id,
