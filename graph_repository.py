@@ -128,9 +128,6 @@ class GraphRepository:
             data = self.graph.nodes[idea_id]
             
             # Reconstruct Idea object for compatibility
-            # Note: Idea constructor requires many fields, we stored them in node attrs
-            # We can just return a namedtuple or object that mimics Idea, or import Idea
-            # For now, let's create a simple object proxy
             class IdeaProxy:
                 def __init__(self, **kwargs):
                     self.__dict__.update(kwargs)
@@ -138,19 +135,45 @@ class GraphRepository:
                     self.content = kwargs.get('content')
                     self.persona = kwargs.get('persona')
                     self.problem_context = kwargs.get('problem_context')
+                    self.timestamp = kwargs.get('timestamp')
                     
             idea_obj = IdeaProxy(**data)
+            if not getattr(idea_obj, 'id', None):
+                idea_obj.id = idea_id
             
+            # 1. AI Score
             evals = data.get('evaluations', [])
+            ai_score = 0.5  # Default neutral score
             if evals:
                 # Metric lookup
-                # evaluations is list of dicts
                 scores = [
                     e.get(f"{metric}_score" if metric != "overall_interest" else "overall_interest", 0.5)
                     for e in evals
                 ]
-                avg_score = np.mean(scores)
-                scored_ideas.append((idea_obj, avg_score))
+                ai_score = np.mean(scores)
+                
+            # 2. Human Feedback Boost
+            # Apply same multipliers as in get_context_ideas to ensure consistency
+            feedback = self.get_human_feedback(idea_id)
+            boost_multiplier = 1.0
+            
+            if feedback:
+                ratings = [f['rating'] for f in feedback]
+                avg_rating = sum(ratings) / len(ratings)
+                
+                if avg_rating >= 4.5:
+                    boost_multiplier = 1.50 # +50%
+                elif avg_rating >= 4.0:
+                    boost_multiplier = 1.25 # +25%
+                elif avg_rating >= 3.0:
+                    boost_multiplier = 1.10 # +10%
+                elif avg_rating >= 2.0:
+                    boost_multiplier = 0.80 # -20%
+                else:
+                    boost_multiplier = 0.50 # -50%
+                    
+            final_score = ai_score * boost_multiplier
+            scored_ideas.append((idea_obj, final_score))
 
         scored_ideas.sort(key=lambda x: x[1], reverse=True)
         return scored_ideas[:n]
@@ -291,6 +314,16 @@ class GraphRepository:
                     data_copy = node_data.copy()
                     data_copy['id'] = idea_id
                     
+                    # Calculate Base Score from Evaluations
+                    evals = node_data.get('evaluations', [])
+                    base_score = 0.5
+                    if evals:
+                        # Use simple mean of overall_interest
+                        scores_list = [e.get('overall_interest', 0.5) for e in evals]
+                        base_score = sum(scores_list) / len(scores_list)
+                    
+                    data_copy['score'] = base_score
+
                     # --- NEW: Human Feedback Boost ---
                     feedback = self.get_human_feedback(idea_id)
                     if feedback:
@@ -298,9 +331,7 @@ class GraphRepository:
                         avg_rating = sum(ratings) / len(ratings)
                         
                         # Apply boost multiplier
-                        # Base score is typically the evaluation score OR generation similarity score
-                        # Here we modify the 'score' attribute if it exists, or assume 1.0
-                        current_score = data_copy.get('score', 0.5) 
+                        current_score = data_copy['score'] 
                         
                         if avg_rating >= 4.5:
                             data_copy['score'] = current_score * 1.50 # +50%
@@ -310,6 +341,12 @@ class GraphRepository:
                             data_copy['boost_reason'] = f"Positive User Rating ({avg_rating:.1f})"
                         elif avg_rating >= 3.0:
                             data_copy['score'] = current_score * 1.10 # +10%
+                        elif avg_rating >= 2.0:
+                            data_copy['score'] = current_score * 0.80 # -20%
+                            data_copy['boost_reason'] = f"Low User Rating ({avg_rating:.1f})"
+                        else:
+                            data_copy['score'] = current_score * 0.50 # -50%
+                            data_copy['boost_reason'] = f"Negative User Rating ({avg_rating:.1f})"
                             
                     context_ideas.append(data_copy)
                     seen_ids.add(idea_id)

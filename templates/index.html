@@ -803,7 +803,7 @@
                             <span class="source-tag">${sourceText}</span>
                         </div>
                         <div class="score-badge">
-                            <span class="score-val">${idea.score.toFixed(2)}</span>
+                            <span class="score-val">${Math.round(idea.score * 100)}</span>
                             <span class="score-label">Interest Score</span>
                         </div>
                     </div>
@@ -852,7 +852,11 @@
             // Reset feedback UI
             document.querySelectorAll('.star').forEach(s => s.classList.remove('active'));
             document.getElementById('feedbackComment').value = '';
-            document.querySelector('.submit-feedback').disabled = false;
+
+            const submitBtn = document.querySelector('.submit-feedback');
+            submitBtn.disabled = false;
+            submitBtn.innerHTML = 'Submit Feedback';
+            submitBtn.style.background = ''; // Reset updated color if any
 
             document.getElementById('ideaModal').style.display = 'block';
         }

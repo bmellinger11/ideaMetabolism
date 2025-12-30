@@ -808,6 +808,8 @@ Format as JSON:
                         problem_context=d.get('problem_context', ''),
                         embedding=d.get('embedding')
                     )
+                    # Preserve boosted score from repository
+                    obj.computed_score = d.get('score', 0)
                     found_ideas.append(obj)
                 except:
                     pass
@@ -816,11 +818,15 @@ Format as JSON:
             # First, score all ideas and collect data
             scored_ideas = []
             for idea in found_ideas:
-                score = 0
+                # Use preserved score
+                score = getattr(idea, 'computed_score', 0)
+                
                 reasoning = ""
                 evals = self.repository.get_evaluations(idea.id)
                 if evals:
-                    score = getattr(evals[0], 'overall_interest', 0)
+                    # Fallback if score is 0 (though repo should provide it)
+                    if score == 0:
+                        score = getattr(evals[0], 'overall_interest', 0)
                     reasoning = evals[0].reasoning
                 scored_ideas.append((idea, score, reasoning))
             
@@ -843,6 +849,8 @@ Format as JSON:
                 
         else:
             # Generation Mode
+            start_time_iso = datetime.now().isoformat()
+            
             # Run the full pipeline
             # Suppress stdout to keep API clean? Or just let it print to server logs.
             self.run(problem, ideas_per_persona=ideas_per_persona, display_results=False)
@@ -856,13 +864,15 @@ Format as JSON:
                 if evals:
                     reasoning = evals[0].reasoning
                 
+                is_fresh = idea.timestamp and idea.timestamp > start_time_iso
+                
                 results.append({
                     "id": idea.id,
                     "persona": idea.persona,
                     "content": idea.content,
                     "score": score,
                     "reasoning": reasoning,
-                    "source": "generated"
+                    "source": "generated" if is_fresh else "repository"
                 })
                 
         return results
