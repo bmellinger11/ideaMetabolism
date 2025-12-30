@@ -692,6 +692,7 @@
     </div>
 
     <script>
+        const BASE_URL = "{{ base_url }}";
         function toggleLimit() {
             const isChecked = document.getElementById('repoOnly').checked;
             const repoGroup = document.getElementById('repoLimitGroup');
@@ -880,7 +881,7 @@
         // Social sharing functions
         function shareToTwitter() {
             const text = `Check out this AI-generated idea: "${currentIdea.content.substring(0, 100)}..." #IdeaMetabolism`;
-            const url = `https://im-demo.ideamagic.net/idea/${currentIdea.id}`;
+            const url = `${BASE_URL}/idea/${currentIdea.id}`;
             const twitterUrl = `https://twitter.com/intent/tweet?text=${encodeURIComponent(text)}&url=${encodeURIComponent(url)}`;
             window.open(twitterUrl, '_blank', 'width=550,height=420');
         }
@@ -888,13 +889,13 @@
         function shareToLinkedIn() {
             // LinkedIn doesn't support pre-filled text via URL parameters
             // We can only share the URL, user must add their own commentary
-            const url = `https://im-demo.ideamagic.net/idea/${currentIdea.id}`;
+            const url = `${BASE_URL}/idea/${currentIdea.id}`;
             const linkedInUrl = `https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent(url)}`;
             window.open(linkedInUrl, '_blank', 'width=550,height=420');
         }
 
         function copyLink() {
-            const url = `https://im-demo.ideamagic.net/idea/${currentIdea.id}`;
+            const url = `${BASE_URL}/idea/${currentIdea.id}`;
             const btn = event.target.closest('.share-btn');
 
             // Try modern clipboard API first

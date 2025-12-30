@@ -13,7 +13,8 @@ system = IdeaMetabolismSystem(llm_provider="anthropic")
 
 @application.route('/')
 def home():
-    return render_template('index.html')
+    base_url = os.environ.get('BASE_URL', 'http://127.0.0.1:5000')
+    return render_template('index.html', base_url=base_url)
 
 
 @application.route('/idea/<idea_id>')
