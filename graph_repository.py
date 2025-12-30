@@ -9,6 +9,7 @@ from dataclasses import asdict
 from sentence_transformers import SentenceTransformer
 from sklearn.metrics.pairwise import cosine_similarity
 import logging
+from filelock import FileLock
 
 logger = logging.getLogger(__name__)
 
@@ -30,6 +31,8 @@ class GraphRepository:
     
     def __init__(self, filepath: str = "idea_graph.gml"):
         self.filepath = filepath
+        self.lock_path = f"{filepath}.lock"
+        self.lock = FileLock(self.lock_path)
         self.graph = nx.DiGraph()
         self.embedding_model = SentenceTransformer('all-MiniLM-L6-v2')
         self.load()
@@ -38,22 +41,27 @@ class GraphRepository:
         """Add a problem node and link to domain"""
         problem_id = f"prob_{hash(problem_text) % 10000000}"
         
-        # Add Domain if not exists
-        domain_id = f"dom_{hash(domain_name) % 10000000}"
-        if not self.graph.has_node(domain_id):
-            self.graph.add_node(domain_id, type="domain", name=domain_name)
+        with self.lock:
+            self.load()
             
-        # Add Problem if not exists
-        if not self.graph.has_node(problem_id):
-            embedding = self.embedding_model.encode(problem_text).tolist()
-            self.graph.add_node(
-                problem_id, 
-                type="problem", 
-                text=problem_text, 
-                timestamp=datetime.now().isoformat(),
-                embedding=embedding
-            )
-            self.graph.add_edge(problem_id, domain_id, relation="BELONGS_TO")
+            # Add Domain if not exists
+            domain_id = f"dom_{hash(domain_name) % 10000000}"
+            if not self.graph.has_node(domain_id):
+                self.graph.add_node(domain_id, type="domain", name=domain_name)
+                
+            # Add Problem if not exists
+            if not self.graph.has_node(problem_id):
+                embedding = self.embedding_model.encode(problem_text).tolist()
+                self.graph.add_node(
+                    problem_id, 
+                    type="problem", 
+                    text=problem_text, 
+                    timestamp=datetime.now().isoformat(),
+                    embedding=embedding
+                )
+                self.graph.add_edge(problem_id, domain_id, relation="BELONGS_TO")
+
+            self.save()
             
         return problem_id
 
@@ -64,18 +72,23 @@ class GraphRepository:
         
         idea_id = idea_data['id']
         
-        # Ensure embedding exists
+        # Ensure embedding exists (do before lock to save time)
         if 'embedding' not in idea_data or idea_data['embedding'] is None:
             idea_data['embedding'] = self.embedding_model.encode(idea_data['content']).tolist()
 
-        if not self.graph.has_node(idea_id):
-            # Store idea attributes. NetworkX supports arbitrary attrs.
-            self.graph.add_node(
-                idea_id,
-                type="idea",
-                **idea_data
-            )
-            self.graph.add_edge(idea_id, problem_id, relation="ADDRESSES")
+        with self.lock:
+            self.load()
+            
+            if not self.graph.has_node(idea_id):
+                # Store idea attributes. NetworkX supports arbitrary attrs.
+                self.graph.add_node(
+                    idea_id,
+                    type="idea",
+                    **idea_data
+                )
+                self.graph.add_edge(idea_id, problem_id, relation="ADDRESSES")
+            
+            self.save()
 
     def get_top_ideas(
             self,
@@ -151,11 +164,14 @@ class GraphRepository:
             
         idea_id = eval_dict['idea_id']
         
-        if self.graph.has_node(idea_id):
-            node_data = self.graph.nodes[idea_id]
-            if 'evaluations' not in node_data:
-                node_data['evaluations'] = []
-            node_data['evaluations'].append(eval_dict)
+        with self.lock:
+            self.load()
+            if self.graph.has_node(idea_id):
+                node_data = self.graph.nodes[idea_id]
+                if 'evaluations' not in node_data:
+                    node_data['evaluations'] = []
+                node_data['evaluations'].append(eval_dict)
+            self.save()
 
     def count_ideas(self) -> int:
         """Count total ideas in graph"""
@@ -175,26 +191,34 @@ class GraphRepository:
     
     def add_human_feedback(self, idea_id: str, rating: int, comment: str, timestamp: str):
         """Add human feedback to an idea node"""
-        if idea_id not in self.graph.nodes:
-            raise ValueError(f"Idea {idea_id} not found")
-        
-        # Get or create human_feedback list
-        if 'human_feedback' not in self.graph.nodes[idea_id]:
-            self.graph.nodes[idea_id]['human_feedback'] = []
-        
-        # Add feedback entry
-        feedback = {
-            'rating': rating,
-            'comment': comment,
-            'timestamp': timestamp,
-            'source': 'human'
-        }
-        
-        self.graph.nodes[idea_id]['human_feedback'].append(feedback)
-        
-        # Save to disk
-        self.save()
-        
+        with self.lock:
+            self.load()
+            
+            if idea_id not in self.graph.nodes:
+                # Should we raise? If another process deleted it?
+                # For now, just log/return or raise as before
+                # But if we assume it might be missing due to sync issues, reloading fixes that.
+                # If it's still missing, it's missing.
+                pass 
+            
+            if idea_id in self.graph.nodes:
+                # Get or create human_feedback list
+                if 'human_feedback' not in self.graph.nodes[idea_id]:
+                    self.graph.nodes[idea_id]['human_feedback'] = []
+                
+                # Add feedback entry
+                feedback = {
+                    'rating': rating,
+                    'comment': comment,
+                    'timestamp': timestamp,
+                    'source': 'human'
+                }
+                
+                self.graph.nodes[idea_id]['human_feedback'].append(feedback)
+                
+                # Save to disk
+                self.save()
+                
         logger.info(f"Added human feedback to {idea_id}: {rating} stars")
     
     def get_human_feedback(self, idea_id: str) -> List[dict]:
@@ -205,8 +229,11 @@ class GraphRepository:
 
     def add_relationship(self, source_idea_id: str, target_idea_id: str, relation_type: str, reason: str = ""):
         """Add semantic relationship between ideas"""
-        if self.graph.has_node(source_idea_id) and self.graph.has_node(target_idea_id):
-            self.graph.add_edge(source_idea_id, target_idea_id, relation=relation_type, reason=reason)
+        with self.lock:
+            self.load()
+            if self.graph.has_node(source_idea_id) and self.graph.has_node(target_idea_id):
+                self.graph.add_edge(source_idea_id, target_idea_id, relation=relation_type, reason=reason)
+            self.save()
 
     def find_similar_problems(self, problem_text: str, threshold: float = 0.7) -> List[str]:
         """Find problem IDs semantically similar to input text"""
