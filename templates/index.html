@@ -462,34 +462,38 @@
         .share-btn {
             flex: 1;
             min-width: 140px;
-            padding: 10px 16px;
-            border: 1px solid var(--border);
+            padding: 12px;
+            border: none;
             border-radius: 8px;
-            background: var(--bg-surface);
             cursor: pointer;
             transition: all 0.2s;
-            font-weight: 500;
+            font-weight: 600;
             font-size: 0.9rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
         }
 
         .share-btn:hover {
             transform: translateY(-1px);
-            box-shadow: var(--shadow-md);
+            filter: brightness(1.1);
+            text-decoration: none;
         }
 
         .share-btn.twitter {
-            border-color: #1DA1F2;
-            color: #1DA1F2;
+            background-color: #000000;
+            color: white;
         }
 
         .share-btn.linkedin {
-            border-color: #0A66C2;
-            color: #0A66C2;
+            background-color: #0A66C2;
+            color: white;
         }
 
         .share-btn.copy {
-            border-color: var(--primary);
-            color: var(--primary);
+            background-color: var(--primary);
+            color: white;
         }
 
         /* Feedback Section */
