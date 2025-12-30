@@ -8,6 +8,9 @@ from typing import List, Dict, Optional, Tuple, Any
 from dataclasses import asdict
 from sentence_transformers import SentenceTransformer
 from sklearn.metrics.pairwise import cosine_similarity
+import logging
+
+logger = logging.getLogger(__name__)
 
 
 class GraphRepository:
@@ -168,6 +171,36 @@ class GraphRepository:
                 def __init__(self, **kwargs):
                     self.__dict__.update(kwargs)
             return [EvalProxy(**e) for e in evals]
+        return []
+    
+    def add_human_feedback(self, idea_id: str, rating: int, comment: str, timestamp: str):
+        """Add human feedback to an idea node"""
+        if idea_id not in self.graph.nodes:
+            raise ValueError(f"Idea {idea_id} not found")
+        
+        # Get or create human_feedback list
+        if 'human_feedback' not in self.graph.nodes[idea_id]:
+            self.graph.nodes[idea_id]['human_feedback'] = []
+        
+        # Add feedback entry
+        feedback = {
+            'rating': rating,
+            'comment': comment,
+            'timestamp': timestamp,
+            'source': 'human'
+        }
+        
+        self.graph.nodes[idea_id]['human_feedback'].append(feedback)
+        
+        # Save to disk
+        self.save()
+        
+        logger.info(f"Added human feedback to {idea_id}: {rating} stars")
+    
+    def get_human_feedback(self, idea_id: str) -> List[dict]:
+        """Get all human feedback for an idea"""
+        if self.graph.has_node(idea_id):
+            return self.graph.nodes[idea_id].get('human_feedback', [])
         return []
 
     def add_relationship(self, source_idea_id: str, target_idea_id: str, relation_type: str, reason: str = ""):

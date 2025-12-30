@@ -955,22 +955,36 @@
             const comment = document.getElementById('feedbackComment').value;
             const submitBtn = document.querySelector('.submit-feedback');
 
-            // TODO: Phase 2 - Send to API
-            console.log('Feedback:', {
-                idea_id: currentIdea.id,
-                rating: selectedRating,
-                comment: comment,
-                timestamp: new Date().toISOString()
-            });
-
-            // Disable button and show confirmation
-            submitBtn.disabled = true;
-            submitBtn.textContent = '✓ Feedback Recorded';
-
-            setTimeout(() => {
-                alert('Thank you for your feedback!\n\n(API integration coming in Phase 2)');
-                closeModal();
-            }, 500);
+            // Send to API
+            fetch('/api/feedback', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    idea_id: currentIdea.id,
+                    rating: selectedRating,
+                    comment: comment,
+                    timestamp: new Date().toISOString()
+                })
+            })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        submitBtn.disabled = true;
+                        submitBtn.textContent = '✓ Feedback Recorded';
+                        setTimeout(() => {
+                            alert('Thank you for your feedback! Your input helps us evolve better ideas.');
+                            closeModal();
+                        }, 500);
+                    } else {
+                        alert('Error: ' + (data.error || 'Unknown error occurred'));
+                    }
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                    alert('Failed to submit feedback. Please try again.');
+                });
         }
     </script>
 </body>
