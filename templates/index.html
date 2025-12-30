@@ -616,9 +616,15 @@
             </div>
 
             <div class="options-row">
-                <div class="checkbox-group">
-                    <input type="checkbox" id="repoOnly" onchange="toggleLimit()">
-                    <label for="repoOnly" class="toggle-label">Search Repository Only</label>
+                <div class="control-group">
+                    <label for="searchMode"
+                        style="font-weight: 600; font-size: 0.9rem; margin-right: 0.5rem; color: var(--text);">Strategy</label>
+                    <select id="searchMode" onchange="toggleLimit()"
+                        style="border-radius: 6px; border: 1px solid var(--border); padding: 0.5rem; background: var(--card-bg); color: var(--text); cursor: pointer;">
+                        <option value="mix" selected>⚡️ Mix (New + History)</option>
+                        <option value="new">✨ Unique New Only</option>
+                        <option value="repository">🔍 History Only</option>
+                    </select>
                 </div>
 
                 <div id="repoLimitGroup" class="number-control" style="display: none;">
@@ -698,19 +704,31 @@
     <script>
         const BASE_URL = "{{ base_url }}";
         function toggleLimit() {
-            const isChecked = document.getElementById('repoOnly').checked;
+            const mode = document.getElementById('searchMode').value;
             const repoGroup = document.getElementById('repoLimitGroup');
             const genGroup = document.getElementById('genConfigGroup');
             const submitBtn = document.getElementById('submitBtn');
 
-            if (isChecked) {
+            // Repo Limit: Show for Mix and Repository
+            if (mode === 'repository' || mode === 'mix') {
                 repoGroup.style.display = 'flex';
-                genGroup.style.display = 'none';
-                submitBtn.innerText = "Search Repository";
             } else {
                 repoGroup.style.display = 'none';
+            }
+
+            // Gen Config: Show for Mix and New
+            if (mode === 'new' || mode === 'mix') {
                 genGroup.style.display = 'flex';
-                submitBtn.innerText = "Generate & Evolve Ideas";
+            } else {
+                genGroup.style.display = 'none';
+            }
+
+            if (mode === 'repository') {
+                submitBtn.innerText = "Search History";
+            } else if (mode === 'new') {
+                submitBtn.innerText = "Generate New Ideas";
+            } else {
+                submitBtn.innerText = "Generate & Mix";
             }
         }
 
@@ -719,7 +737,6 @@
 
         async function processIdea() {
             const problem = document.getElementById('problem').value;
-            const repoOnly = document.getElementById('repoOnly').checked;
             const limit = document.getElementById('limit').value;
             const ideasPerPersona = document.getElementById('ideasPerPersona').value;
             const btn = document.getElementById('submitBtn');
@@ -743,7 +760,7 @@
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
                         problem: problem,
-                        repoOnly: repoOnly,
+                        mode: document.getElementById('searchMode').value,
                         limit: limit,
                         ideasPerPersona: ideasPerPersona
                     })

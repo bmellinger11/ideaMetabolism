@@ -569,14 +569,16 @@ If no relationships, return []."""
             except:
                 pass
 
-    def run_evolution_cycle(self, ideas: List[Idea]):
-        """Stage 4: Evolutionary Synthesis (Breeding)"""
+    def run_evolution_cycle(self, ideas: List[Idea]) -> List[Idea]:
+        """Run Stage 4: Evolutionary Synthesis (Resulting in new ideas)"""
         logger.info(f"\n{'='*60}")
         logger.info("STAGE 4: EVOLUTIONARY SYNTHESIS")
         logger.info(f"{'='*60}\n")
         
+        newly_created = []
+        
         if not ideas:
-            return
+            return []
 
         # 1. Selection: Find Novel and Feasible parents from current batch AND history
         
@@ -599,7 +601,7 @@ If no relationships, return []."""
                 historical_ideas.append(obj)
             except:
                 pass
-
+        
         # Combine candidates (ensure uniqueness by ID)
         all_candidates = {idea.id: idea for idea in ideas}
         for h_idea in historical_ideas:
@@ -627,7 +629,7 @@ If no relationships, return []."""
         
         if len(scored_candidates) < 2:
             logger.info(f"Not enough evaluated ideas for breeding. Need 2, have {len(scored_candidates)}.")
-            return
+            return []
 
         # Select Parent A (Most Novel)
         parent_a_data = max(scored_candidates, key=lambda x: x['novelty'])
@@ -636,7 +638,7 @@ If no relationships, return []."""
         # Select Parent B (Most Feasible) - distinct from A
         remaining = [c for c in scored_candidates if c['idea'].id != parent_a.id]
         if not remaining:
-            return
+            return []
             
         parent_b_data = max(remaining, key=lambda x: x['feasibility'])
         parent_b = parent_b_data['idea']
@@ -733,6 +735,8 @@ Format as JSON:
             logger.info("Extracting relationships for child idea...")
             self.extract_relationships([child_idea], existing_for_eval)
             
+            newly_created.append(child_idea)
+            
         except json.JSONDecodeError:
             logger.error("Failed to generate valid JSON for child idea.")
         except Exception as e:
@@ -740,6 +744,7 @@ Format as JSON:
             
         # Ensure changes are saved to disk
         self.repository.save()
+        return newly_created
     
     def display_top_ideas(self, n: int = 5, problem: Optional[str] = None):
         """Display top N ideas by overall interest"""
@@ -764,19 +769,21 @@ Format as JSON:
                 print(f"   Reasoning: {eval_summary.reasoning[:150]}...")
             print()
     
-    def run(self, problem: str, ideas_per_persona: int = 1, display_results: bool = True):
-        """Run complete generation and triage cycle"""
+    def run(self, problem: str, ideas_per_persona: int = 1, display_results: bool = True) -> List[Idea]:
+        """Run complete generation and triage cycle. Returns all new ideas."""
         
         logger.info(f"\nPROBLEM: {problem}\n")
         
         # Stage 1: Generate
-        ideas = self.run_generation_cycle(problem, ideas_per_persona)
+        gen_ideas = self.run_generation_cycle(problem, ideas_per_persona)
         
         # Stage 2: Triage
-        self.run_triage_cycle(ideas)
+        self.run_triage_cycle(gen_ideas)
         
         # Stage 4: Evolution (NEW)
-        self.run_evolution_cycle(ideas)
+        evo_ideas = self.run_evolution_cycle(gen_ideas)
+        
+        all_new_ideas = gen_ideas + evo_ideas
         
         # Display results
         if display_results:
@@ -784,13 +791,19 @@ Format as JSON:
         
         logger.info(f"\nRepository saved to: {self.repository.filepath}")
         logger.info(f"Total ideas in repository: {self.repository.count_ideas()}")
-
-    def process_problem(self, problem: str, repo_only: bool = False, limit: int = 5, ideas_per_persona: int = 1) -> List[Dict]:
-        """Process a problem statement and return structured results"""
         
+        return all_new_ideas
+
+    def process_problem(self, problem: str, repo_only: bool = False, mode: str = "mix", limit: int = 5, ideas_per_persona: int = 1) -> List[Dict]:
+        """Process a problem statement and return structured results. Mode: mix, new, repository"""
+        
+        # Backward compatibility
+        if repo_only:
+            mode = "repository"
+            
         results = []
         
-        if repo_only:
+        if mode == "repository":
             # Semantic Search Mode
             # Re-using context retrieval logic
             context_dicts = self.repository.get_context_ideas(problem)
@@ -848,32 +861,61 @@ Format as JSON:
                 })
                 
         else:
-            # Generation Mode
+            # Generation Mode (Mix or New Only)
             start_time_iso = datetime.now().isoformat()
             
-            # Run the full pipeline
-            # Suppress stdout to keep API clean? Or just let it print to server logs.
-            self.run(problem, ideas_per_persona=ideas_per_persona, display_results=False)
+            # Run the full pipeline - returns NEW ideas
+            new_ideas = self.run(problem, ideas_per_persona=ideas_per_persona, display_results=False)
             
-            # Retrieve top results
-            top_ideas = self.repository.get_top_ideas(limit, problem_filter=problem)
+            # Collect New Ideas Results
+            final_items = []
             
-            for idea, score in top_ideas:
+            # 1. Adds New Ideas
+            for idea in new_ideas:
+                score = 0
                 reasoning = ""
                 evals = self.repository.get_evaluations(idea.id)
                 if evals:
+                    score = getattr(evals[0], 'overall_interest', 0)
                     reasoning = evals[0].reasoning
                 
-                is_fresh = idea.timestamp and idea.timestamp > start_time_iso
+                # Check for feedback/boost (unlikely for new ideas, but possible if re-generating known hash?)
+                # For now assume new ideas have base score
                 
-                results.append({
+                final_items.append({
                     "id": idea.id,
                     "persona": idea.persona,
                     "content": idea.content,
                     "score": score,
                     "reasoning": reasoning,
-                    "source": "generated" if is_fresh else "repository"
+                    "source": "generated" # It's fresh
                 })
+            
+            # 2. Add Repository Ideas (If Mix)
+            if mode == "mix":
+                top_ideas = self.repository.get_top_ideas(limit, problem_filter=problem)
+                
+                new_ids = {idea.id for idea in new_ideas}
+                
+                for idea, score in top_ideas:
+                    if idea.id in new_ids:
+                        continue
+                        
+                    reasoning = ""
+                    evals = self.repository.get_evaluations(idea.id)
+                    if evals:
+                        reasoning = evals[0].reasoning
+                    
+                    final_items.append({
+                        "id": idea.id,
+                        "persona": idea.persona,
+                        "content": idea.content,
+                        "score": score,
+                        "reasoning": reasoning,
+                        "source": "repository"
+                    })
+            
+            results = final_items
                 
         return results
 

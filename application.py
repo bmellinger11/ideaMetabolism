@@ -79,18 +79,23 @@ def submit_feedback():
 def process():
     data = request.json
     problem = data.get('problem')
+    mode = data.get('mode', 'mix')
     repo_only = data.get('repoOnly', False)
+    
+    # Backward compat
+    if repo_only:
+        mode = 'repository'
+        
     limit = int(data.get('limit', 5))
     ideas_per_persona = int(data.get('ideasPerPersona', 1))
     
     if not problem:
         return jsonify({"error": "Problem statement required"}), 400
-    
     try:
         # Capture logs for this request
         log_buffer = setup_logging(capture_logs=True)
         
-        results = system.process_problem(problem, repo_only=repo_only, limit=limit, ideas_per_persona=ideas_per_persona)
+        results = system.process_problem(problem, mode=mode, limit=limit, ideas_per_persona=ideas_per_persona)
         return jsonify({
             "results": results,
             "logs": log_buffer
