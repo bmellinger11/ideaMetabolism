@@ -263,8 +263,32 @@ class GraphRepository:
                     # Make sure ID is included in the dict
                     data_copy = node_data.copy()
                     data_copy['id'] = idea_id
+                    
+                    # --- NEW: Human Feedback Boost ---
+                    feedback = self.get_human_feedback(idea_id)
+                    if feedback:
+                        ratings = [f['rating'] for f in feedback]
+                        avg_rating = sum(ratings) / len(ratings)
+                        
+                        # Apply boost multiplier
+                        # Base score is typically the evaluation score OR generation similarity score
+                        # Here we modify the 'score' attribute if it exists, or assume 1.0
+                        current_score = data_copy.get('score', 0.5) 
+                        
+                        if avg_rating >= 4.5:
+                            data_copy['score'] = current_score * 1.50 # +50%
+                            data_copy['boost_reason'] = f"High User Rating ({avg_rating:.1f})"
+                        elif avg_rating >= 4.0:
+                            data_copy['score'] = current_score * 1.25 # +25%
+                            data_copy['boost_reason'] = f"Positive User Rating ({avg_rating:.1f})"
+                        elif avg_rating >= 3.0:
+                            data_copy['score'] = current_score * 1.10 # +10%
+                            
                     context_ideas.append(data_copy)
                     seen_ids.add(idea_id)
+        
+        # Sort by boosted score desc
+        context_ideas.sort(key=lambda x: x.get('score', 0), reverse=True)
                     
         return context_ideas
 
