@@ -158,20 +158,66 @@
         }
 
         .toggle-label {
-            margin: 0;
             font-weight: 500;
-            color: var(--text-secondary);
+            font-size: 0.9rem;
+            color: var(--text-main);
+            margin-bottom: 0.4rem;
+            display: block;
+        }
+
+        .strategy-select {
+            border-radius: 0.5rem;
+            border: 1px solid var(--border);
+            padding: 0.75rem 1rem;
+            background: var(--bg);
+            color: var(--text);
+            font-size: 1rem;
+            width: 100%;
+            height: 46px;
+            appearance: none;
+            -webkit-appearance: none;
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%236b7280' d='M6 8.825L1.175 4 2.238 2.938 6 6.7l3.763-3.762L10.825 4z'/%3E%3C/svg%3E");
+            background-repeat: no-repeat;
+            background-position: right 1rem center;
             cursor: pointer;
+            box-sizing: border-box;
+        }
+
+        .strategy-select:focus {
+            outline: none;
+            border-color: var(--border-focus);
+            background: #fff;
+            box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1);
+        }
+
+        .control-group {
+            display: flex;
+            flex-direction: column;
+            flex: 2;
         }
 
         .number-control {
             display: flex;
-            align-items: center;
-            gap: 10px;
+            flex-direction: column;
+            flex: 1;
+            transition: opacity 0.2s;
+        }
+
+        .number-control.disabled {
+            opacity: 0.4;
+            pointer-events: none;
         }
 
         .number-control input {
-            width: 80px;
+            padding: 0.75rem;
+            border-radius: 0.5rem;
+            border: 1px solid var(--border);
+            background: var(--bg);
+            color: var(--text);
+            height: 46px;
+            font-size: 1rem;
+            box-sizing: border-box;
+            width: 100%;
         }
 
         /* Button */
@@ -617,24 +663,22 @@
 
             <div class="options-row">
                 <div class="control-group">
-                    <label for="searchMode"
-                        style="font-weight: 600; font-size: 0.9rem; margin-right: 0.5rem; color: var(--text);">Strategy</label>
-                    <select id="searchMode" onchange="toggleLimit()"
-                        style="border-radius: 6px; border: 1px solid var(--border); padding: 0.5rem; background: var(--card-bg); color: var(--text); cursor: pointer;">
-                        <option value="mix" selected>⚡️ Mix (New + History)</option>
-                        <option value="new">✨ Unique New Only</option>
-                        <option value="repository">🔍 History Only</option>
+                    <label for="searchMode" class="toggle-label">Strategy</label>
+                    <select id="searchMode" onchange="toggleLimit()" class="strategy-select">
+                        <option value="mix" selected>Generate Ideas & Search Memory</option>
+                        <option value="new">Generate New Ideas Only</option>
+                        <option value="repository">Search Memory Only</option>
                     </select>
-                </div>
-
-                <div id="repoLimitGroup" class="number-control" style="display: none;">
-                    <label for="limit" class="toggle-label">Max Results</label>
-                    <input type="number" id="limit" value="5" min="1" max="20">
                 </div>
 
                 <div id="genConfigGroup" class="number-control">
                     <label for="ideasPerPersona" class="toggle-label">Ideas per Persona</label>
                     <input type="number" id="ideasPerPersona" value="1" min="1" max="5">
+                </div>
+
+                <div id="repoLimitGroup" class="number-control">
+                    <label for="limit" class="toggle-label">Max Results</label>
+                    <input type="number" id="limit" value="5" min="1" max="20">
                 </div>
             </div>
 
@@ -709,26 +753,30 @@
             const genGroup = document.getElementById('genConfigGroup');
             const submitBtn = document.getElementById('submitBtn');
 
-            // Repo Limit: Show for Mix and Repository
+            // Repo Limit: Enable for Mix and Repository
             if (mode === 'repository' || mode === 'mix') {
-                repoGroup.style.display = 'flex';
+                repoGroup.classList.remove('disabled');
+                document.getElementById('limit').disabled = false;
             } else {
-                repoGroup.style.display = 'none';
+                repoGroup.classList.add('disabled');
+                document.getElementById('limit').disabled = true;
             }
 
-            // Gen Config: Show for Mix and New
+            // Gen Config: Enable for Mix and New
             if (mode === 'new' || mode === 'mix') {
-                genGroup.style.display = 'flex';
+                genGroup.classList.remove('disabled');
+                document.getElementById('ideasPerPersona').disabled = false;
             } else {
-                genGroup.style.display = 'none';
+                genGroup.classList.add('disabled');
+                document.getElementById('ideasPerPersona').disabled = true;
             }
 
             if (mode === 'repository') {
-                submitBtn.innerText = "Search History";
+                submitBtn.innerText = "Search Memory";
             } else if (mode === 'new') {
                 submitBtn.innerText = "Generate New Ideas";
             } else {
-                submitBtn.innerText = "Generate & Mix";
+                submitBtn.innerText = "Generate Ideas & Search Memory";
             }
         }
 
