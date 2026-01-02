@@ -380,6 +380,19 @@
             color: var(--text-secondary);
         }
 
+        .card-footer {
+            margin-top: 1.25rem;
+            padding-top: 0.75rem;
+            border-top: 1px dashed var(--border);
+            text-align: center;
+        }
+
+        .cta-text {
+            font-size: 0.8rem;
+            color: var(--text-muted);
+            font-style: italic;
+        }
+
         .evaluation-label {
             font-weight: 600;
             color: var(--text-main);
@@ -879,6 +892,10 @@
                     <div class="evaluation-box">
                         <span class="evaluation-label">AI Evaluation:</span> ${idea.reasoning}
                     </div>` : ''}
+
+                    <div class="card-footer">
+                        <span class="cta-text">Click on card to select for feedback or sharing</span>
+                    </div>
                 </div>
             `}).join('');
 
