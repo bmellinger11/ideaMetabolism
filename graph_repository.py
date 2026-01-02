@@ -141,39 +141,7 @@ class GraphRepository:
             if not getattr(idea_obj, 'id', None):
                 idea_obj.id = idea_id
             
-            # 1. AI Score
-            evals = data.get('evaluations', [])
-            ai_score = 0.5  # Default neutral score
-            if evals:
-                # Metric lookup
-                scores = [
-                    e.get(f"{metric}_score" if metric != "overall_interest" else "overall_interest", 0.5)
-                    for e in evals
-                ]
-                ai_score = np.mean(scores)
-                
-            # 2. Human Feedback Boost
-            # Apply same multipliers as in get_context_ideas to ensure consistency
-            feedback = self.get_human_feedback(idea_id)
-            boost_multiplier = 1.0
-            
-            if feedback:
-                ratings = [f['rating'] for f in feedback]
-                avg_rating = sum(ratings) / len(ratings)
-                
-                if avg_rating >= 4.5:
-                    boost_multiplier = 1.50 # +50%
-                elif avg_rating >= 4.0:
-                    boost_multiplier = 1.25 # +25%
-                elif avg_rating >= 3.0:
-                    boost_multiplier = 1.10 # +10%
-                elif avg_rating >= 2.0:
-                    boost_multiplier = 0.80 # -20%
-                else:
-                    boost_multiplier = 0.50 # -50%
-                    
-            final_score = ai_score * boost_multiplier
-            scored_ideas.append((idea_obj, final_score))
+            scored_ideas.append((idea_obj, self.get_score_breakdown(idea_id, metric)['combined_score']))
 
         scored_ideas.sort(key=lambda x: x[1], reverse=True)
         return scored_ideas[:n]
@@ -250,6 +218,58 @@ class GraphRepository:
             return self.graph.nodes[idea_id].get('human_feedback', [])
         return []
 
+    def get_score_breakdown(self, idea_id: str, metric: str = "overall_interest") -> Dict[str, Any]:
+        """Calculate detailed breakdown of AI vs Human scores"""
+        data = self.graph.nodes.get(idea_id, {})
+        if not data:
+            return {}
+
+        # 1. AI Score
+        evals = data.get('evaluations', [])
+        ai_score = 0.5
+        if evals:
+            # Metric lookup
+            score_key = f"{metric}_score" if metric != "overall_interest" else "overall_interest"
+            scores = [e.get(score_key, 0.5) for e in evals]
+            ai_score = float(np.mean(scores))
+        
+        # 2. Human Feedback
+        feedback = data.get('human_feedback', [])
+        avg_rating = 0.0
+        feedback_count = len(feedback)
+        boost_multiplier = 1.0
+        boost_reason = ""
+
+        if feedback_count > 0:
+            ratings = [f['rating'] for f in feedback]
+            avg_rating = sum(ratings) / feedback_count
+            
+            if avg_rating >= 4.5:
+                boost_multiplier = 1.50
+                boost_reason = f"High User Rating ({avg_rating:.1f})"
+            elif avg_rating >= 4.0:
+                boost_multiplier = 1.25
+                boost_reason = f"Positive User Rating ({avg_rating:.1f})"
+            elif avg_rating >= 3.0:
+                boost_multiplier = 1.10
+            elif avg_rating >= 2.0:
+                boost_multiplier = 0.80
+                boost_reason = f"Low User Rating ({avg_rating:.1f})"
+            else:
+                boost_multiplier = 0.50
+                boost_reason = f"Negative User Rating ({avg_rating:.1f})"
+        
+        combined_score = ai_score * boost_multiplier
+
+        return {
+            "ai_score": ai_score,
+            "avg_rating": avg_rating,
+            "feedback_count": feedback_count,
+            "boost_multiplier": boost_multiplier,
+            "boost_reason": boost_reason,
+            "combined_score": combined_score
+        }
+
     def add_relationship(self, source_idea_id: str, target_idea_id: str, relation_type: str, reason: str = ""):
         """Add semantic relationship between ideas"""
         with self.lock:
@@ -314,39 +334,10 @@ class GraphRepository:
                     data_copy = node_data.copy()
                     data_copy['id'] = idea_id
                     
-                    # Calculate Base Score from Evaluations
-                    evals = node_data.get('evaluations', [])
-                    base_score = 0.5
-                    if evals:
-                        # Use simple mean of overall_interest
-                        scores_list = [e.get('overall_interest', 0.5) for e in evals]
-                        base_score = sum(scores_list) / len(scores_list)
-                    
-                    data_copy['score'] = base_score
-
-                    # --- NEW: Human Feedback Boost ---
-                    feedback = self.get_human_feedback(idea_id)
-                    if feedback:
-                        ratings = [f['rating'] for f in feedback]
-                        avg_rating = sum(ratings) / len(ratings)
-                        
-                        # Apply boost multiplier
-                        current_score = data_copy['score'] 
-                        
-                        if avg_rating >= 4.5:
-                            data_copy['score'] = current_score * 1.50 # +50%
-                            data_copy['boost_reason'] = f"High User Rating ({avg_rating:.1f})"
-                        elif avg_rating >= 4.0:
-                            data_copy['score'] = current_score * 1.25 # +25%
-                            data_copy['boost_reason'] = f"Positive User Rating ({avg_rating:.1f})"
-                        elif avg_rating >= 3.0:
-                            data_copy['score'] = current_score * 1.10 # +10%
-                        elif avg_rating >= 2.0:
-                            data_copy['score'] = current_score * 0.80 # -20%
-                            data_copy['boost_reason'] = f"Low User Rating ({avg_rating:.1f})"
-                        else:
-                            data_copy['score'] = current_score * 0.50 # -50%
-                            data_copy['boost_reason'] = f"Negative User Rating ({avg_rating:.1f})"
+                    breakdown = self.get_score_breakdown(idea_id)
+                    data_copy['score'] = breakdown['combined_score']
+                    if breakdown['boost_reason']:
+                        data_copy['boost_reason'] = breakdown['boost_reason']
                             
                     context_ideas.append(data_copy)
                     seen_ids.add(idea_id)

@@ -31,10 +31,14 @@ def view_idea(idea_id):
         evals = system.repository.get_evaluations(idea_id)
         evaluation = evals[0] if evals else None
         
+        # Get score breakdown
+        breakdown = system.repository.get_score_breakdown(idea_id)
+        
         return render_template('idea_detail.html', 
                              idea_id=idea_id,
                              idea=idea_data,
-                             evaluation=evaluation)
+                             evaluation=evaluation,
+                             breakdown=breakdown)
     except Exception as e:
         return f"Error loading idea: {str(e)}", 500
 

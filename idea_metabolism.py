@@ -851,11 +851,13 @@ Format as JSON:
                 if i >= limit:
                     break
                 
+                breakdown = self.repository.get_score_breakdown(idea.id)
                 results.append({
                     "id": idea.id,
                     "persona": idea.persona,
                     "content": idea.content,
-                    "score": score,
+                    "score": breakdown['combined_score'],
+                    "breakdown": breakdown,
                     "reasoning": reasoning,
                     "source": "repository"
                 })
@@ -877,16 +879,21 @@ Format as JSON:
                 evals = self.repository.get_evaluations(idea.id)
                 if evals:
                     score = getattr(evals[0], 'overall_interest', 0)
+                reasoning = ""
+                evals = self.repository.get_evaluations(idea.id)
+                if evals:
                     reasoning = evals[0].reasoning
                 
                 # Check for feedback/boost (unlikely for new ideas, but possible if re-generating known hash?)
                 # For now assume new ideas have base score
                 
+                breakdown = self.repository.get_score_breakdown(idea.id)
                 final_items.append({
                     "id": idea.id,
                     "persona": idea.persona,
                     "content": idea.content,
-                    "score": score,
+                    "score": breakdown['combined_score'],
+                    "breakdown": breakdown,
                     "reasoning": reasoning,
                     "source": "generated" # It's fresh
                 })
@@ -906,11 +913,13 @@ Format as JSON:
                     if evals:
                         reasoning = evals[0].reasoning
                     
+                    breakdown = self.repository.get_score_breakdown(idea.id)
                     final_items.append({
                         "id": idea.id,
                         "persona": idea.persona,
                         "content": idea.content,
-                        "score": score,
+                        "score": breakdown['combined_score'],
+                        "breakdown": breakdown,
                         "reasoning": reasoning,
                         "source": "repository"
                     })

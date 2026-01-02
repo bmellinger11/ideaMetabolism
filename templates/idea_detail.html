@@ -146,9 +146,22 @@
         {% if evaluation %}
         <div class="evaluation">
             <h3>AI Evaluation</h3>
-            <p style="margin-bottom: 1rem;">{{ evaluation.reasoning }}</p>
-            <div>
-                <span class="label">Interest Score:</span> {{ "%.2f"|format(evaluation.overall_interest) }}
+            <p style="margin-bottom: 1.5rem;">{{ evaluation.reasoning }}</p>
+
+            <div style="display: grid; gap: 0.75rem;">
+                <div>
+                    <span class="label">AI Interest:</span>
+                    {{ (breakdown.ai_score * 100)|round|int }}
+                </div>
+                <div>
+                    <span class="label">User Feedback:</span>
+                    {{ breakdown.avg_rating|round(1) }}★ ({{ breakdown.feedback_count }} ratings)
+                </div>
+                <div style="margin-top: 0.5rem; padding-top: 0.75rem; border-top: 1px dashed var(--border);">
+                    <span class="label" style="font-size: 1.1rem; color: var(--primary);">Combined Score:</span>
+                    <span style="font-size: 1.1rem; font-weight: 700; color: var(--primary);">{{
+                        (breakdown.combined_score * 100)|round|int }}</span>
+                </div>
             </div>
         </div>
         {% endif %}

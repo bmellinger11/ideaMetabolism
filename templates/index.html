@@ -923,9 +923,25 @@
             document.getElementById('modalContent').textContent = idea.content;
 
             if (idea.reasoning) {
+                const b = idea.breakdown || { ai_score: (idea.score || 0) / 100, avg_rating: 0, feedback_count: 0, combined_score: (idea.score || 0) / 100 };
                 document.getElementById('modalEvaluation').innerHTML = `
                     <div class="evaluation-box">
-                        <span class="evaluation-label">AI Evaluation:</span> ${idea.reasoning}
+                        <div style="margin-bottom: 1rem;">
+                            <span class="evaluation-label">AI Evaluation:</span> ${idea.reasoning}
+                        </div>
+                        <div style="display: grid; gap: 0.5rem; padding-top: 1rem; border-top: 1px dashed #cbd5e1;">
+                            <div style="font-size: 0.85rem;">
+                                <span class="evaluation-label">AI Interest:</span> ${Math.round(b.ai_score * 100)}
+                            </div>
+                            <div style="font-size: 0.85rem;">
+                                <span class="evaluation-label">User Feedback:</span> 
+                                ${b.avg_rating.toFixed(1)}★ (${b.feedback_count} ratings)
+                            </div>
+                            <div style="font-size: 1rem; margin-top: 0.25rem; color: var(--primary);">
+                                <span class="evaluation-label" style="color: var(--primary);">Combined Score:</span> 
+                                <strong>${Math.round(b.combined_score * 100)}</strong>
+                            </div>
+                        </div>
                     </div>`;
             } else {
                 document.getElementById('modalEvaluation').innerHTML = '';
@@ -948,14 +964,33 @@
             document.getElementById('ideaModal').style.display = 'none';
         }
 
+        // Centralized rating logic
+        function autoRate(rating) {
+            selectedRating = rating;
+
+            // UI Update
+            document.querySelectorAll('.star').forEach((s, idx) => {
+                s.classList.toggle('active', idx < rating);
+            });
+
+            // API Post
+            fetch('/api/feedback', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    idea_id: currentIdea.id,
+                    rating: rating,
+                    comment: '', // Empty comment for standalone rating
+                    timestamp: new Date().toISOString()
+                })
+            }).catch(err => console.error('Error auto-rating:', err));
+        }
+
         // Star rating
         document.addEventListener('DOMContentLoaded', function () {
             document.querySelectorAll('.star').forEach(star => {
                 star.addEventListener('click', function () {
-                    selectedRating = parseInt(this.dataset.rating);
-                    document.querySelectorAll('.star').forEach((s, idx) => {
-                        s.classList.toggle('active', idx < selectedRating);
-                    });
+                    autoRate(parseInt(this.dataset.rating));
                 });
             });
 
@@ -970,6 +1005,7 @@
 
         // Social sharing functions
         function shareToTwitter() {
+            autoRate(5); // Auto-rate 5 stars on share
             const text = `Check out this AI-generated idea: "${currentIdea.content.substring(0, 100)}..." #IdeaMetabolism`;
             const url = `${BASE_URL}/idea/${currentIdea.id}`;
             const twitterUrl = `https://twitter.com/intent/tweet?text=${encodeURIComponent(text)}&url=${encodeURIComponent(url)}`;
@@ -977,14 +1013,14 @@
         }
 
         function shareToLinkedIn() {
-            // LinkedIn doesn't support pre-filled text via URL parameters
-            // We can only share the URL, user must add their own commentary
+            autoRate(5); // Auto-rate 5 stars on share
             const url = `${BASE_URL}/idea/${currentIdea.id}`;
             const linkedInUrl = `https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent(url)}`;
             window.open(linkedInUrl, '_blank', 'width=550,height=420');
         }
 
         function copyLink() {
+            autoRate(5); // Auto-rate 5 stars on share
             const url = `${BASE_URL}/idea/${currentIdea.id}`;
             const btn = event.target.closest('.share-btn');
 
@@ -1036,17 +1072,17 @@
             document.body.removeChild(textArea);
         }
 
-        // Feedback submission (Phase 2 will add API call)
+        // Feedback submission - Handles comments
         function submitFeedback() {
-            if (selectedRating === 0) {
-                alert('Please select a rating (1-5 stars)');
+            const comment = document.getElementById('feedbackComment').value.trim();
+            const submitBtn = document.querySelector('.submit-feedback');
+
+            if (!comment) {
+                alert('Please enter a comment before submitting.');
                 return;
             }
 
-            const comment = document.getElementById('feedbackComment').value;
-            const submitBtn = document.querySelector('.submit-feedback');
-
-            // Send to API
+            // Send to API (comment only, rating already sent or optional here)
             fetch('/api/feedback', {
                 method: 'POST',
                 headers: {
@@ -1054,7 +1090,7 @@
                 },
                 body: JSON.stringify({
                     idea_id: currentIdea.id,
-                    rating: selectedRating,
+                    rating: selectedRating, // Pass existing selection if any
                     comment: comment,
                     timestamp: new Date().toISOString()
                 })
