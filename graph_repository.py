@@ -278,6 +278,77 @@ class GraphRepository:
                 self.graph.add_edge(source_idea_id, target_idea_id, relation=relation_type, reason=reason)
             self.save()
 
+    def get_idea_relationships(self, idea_id: str) -> Dict[str, List[Dict]]:
+        """Get all relationships for an idea, grouped by type.
+        
+        Returns:
+            {
+                "parents": [{"id": ..., "persona": ..., "content_preview": ..., "reason": ...}],
+                "children": [...],
+                "semantic": [{"id": ..., "type": ..., "reason": ...}]
+            }
+        """
+        if not self.graph.has_node(idea_id):
+            return {"parents": [], "children": [], "semantic": []}
+        
+        parents = []
+        children = []
+        semantic = []
+        
+        # Outgoing edges (current idea is source)
+        for _, target, edge_data in self.graph.out_edges(idea_id, data=True):
+            relation = edge_data.get("relation", "")
+            reason = edge_data.get("reason", "")
+            
+            # Skip non-idea nodes (e.g., ADDRESSES -> Problem)
+            target_data = self.graph.nodes.get(target, {})
+            if target_data.get("type") != "idea":
+                continue
+            
+            if relation in ("EVOLVED_FROM", "DERIVED_FROM"):
+                parents.append({
+                    "id": target,
+                    "persona": target_data.get("persona", "Unknown"),
+                    "content_preview": target_data.get("content", "")[:100] + "...",
+                    "reason": reason
+                })
+            else:
+                semantic.append({
+                    "id": target,
+                    "persona": target_data.get("persona", "Unknown"),
+                    "content_preview": target_data.get("content", "")[:100] + "...",
+                    "type": relation,
+                    "reason": reason
+                })
+        
+        # Incoming edges (current idea is target)
+        for source, _, edge_data in self.graph.in_edges(idea_id, data=True):
+            relation = edge_data.get("relation", "")
+            reason = edge_data.get("reason", "")
+            
+            source_data = self.graph.nodes.get(source, {})
+            if source_data.get("type") != "idea":
+                continue
+            
+            if relation in ("EVOLVED_FROM", "DERIVED_FROM"):
+                # If something evolved FROM this idea, this idea is a parent
+                children.append({
+                    "id": source,
+                    "persona": source_data.get("persona", "Unknown"),
+                    "content_preview": source_data.get("content", "")[:100] + "...",
+                    "reason": reason
+                })
+            else:
+                semantic.append({
+                    "id": source,
+                    "persona": source_data.get("persona", "Unknown"),
+                    "content_preview": source_data.get("content", "")[:100] + "...",
+                    "type": f"{relation} (incoming)",
+                    "reason": reason
+                })
+        
+        return {"parents": parents, "children": children, "semantic": semantic}
+
     def find_similar_problems(self, problem_text: str, threshold: float = 0.7) -> List[str]:
         """Find problem IDs semantically similar to input text"""
         query_embedding = self.embedding_model.encode(problem_text).reshape(1, -1)

@@ -1,4 +1,5 @@
 import os
+import json
 from flask import Flask, render_template, request, jsonify
 from idea_metabolism import IdeaMetabolismSystem, setup_logging
 
@@ -34,11 +35,15 @@ def view_idea(idea_id):
         # Get score breakdown
         breakdown = system.repository.get_score_breakdown(idea_id)
         
+        # Get relationships
+        relationships = system.repository.get_idea_relationships(idea_id)
+        
         return render_template('idea_detail.html', 
                              idea_id=idea_id,
                              idea=idea_data,
                              evaluation=evaluation,
-                             breakdown=breakdown)
+                             breakdown=breakdown,
+                             relationships_json=json.dumps(relationships))
     except Exception as e:
         return f"Error loading idea: {str(e)}", 500
 

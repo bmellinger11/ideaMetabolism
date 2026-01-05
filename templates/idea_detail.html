@@ -166,6 +166,175 @@
         </div>
         {% endif %}
 
+        <!-- Relationship Visualization -->
+        <div class="relationships-section">
+            <div class="tabs">
+                <button class="tab active" data-tab="lineage">Lineage</button>
+                <button class="tab" data-tab="semantic">Other Connections</button>
+            </div>
+            <div id="lineage" class="tab-content active">
+                <div id="parents-container"></div>
+                <div id="children-container"></div>
+            </div>
+            <div id="semantic" class="tab-content">
+                <div id="semantic-container"></div>
+            </div>
+        </div>
+
+        <style>
+            .relationships-section {
+                margin-top: 1.5rem;
+                padding: 1rem;
+                background: #f8fafc;
+                border-radius: 12px;
+            }
+
+            .tabs {
+                display: flex;
+                gap: 0.5rem;
+                margin-bottom: 1rem;
+            }
+
+            .tab {
+                padding: 0.5rem 1rem;
+                background: #e2e8f0;
+                border: none;
+                border-radius: 6px;
+                cursor: pointer;
+                font-size: 0.85rem;
+                font-weight: 500;
+                transition: all 0.2s;
+            }
+
+            .tab:hover {
+                background: #cbd5e1;
+            }
+
+            .tab.active {
+                background: var(--primary);
+                color: white;
+            }
+
+            .tab-content {
+                display: none;
+            }
+
+            .tab-content.active {
+                display: block;
+            }
+
+            .rel-group {
+                margin-bottom: 1rem;
+            }
+
+            .rel-group-title {
+                font-size: 0.8rem;
+                text-transform: uppercase;
+                color: var(--text-muted);
+                font-weight: 600;
+                margin-bottom: 0.5rem;
+            }
+
+            .rel-card {
+                display: block;
+                background: white;
+                padding: 0.75rem 1rem;
+                border-radius: 8px;
+                margin-bottom: 0.5rem;
+                text-decoration: none;
+                color: inherit;
+                border-left: 3px solid var(--primary);
+                transition: all 0.2s;
+            }
+
+            .rel-card:hover {
+                transform: translateX(4px);
+                box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+            }
+
+            .rel-persona {
+                font-weight: 600;
+                color: var(--primary);
+                font-size: 0.8rem;
+                text-transform: uppercase;
+            }
+
+            .rel-preview {
+                font-size: 0.9rem;
+                color: var(--text-secondary);
+                margin-top: 0.25rem;
+            }
+
+            .rel-reason {
+                font-size: 0.75rem;
+                color: var(--text-muted);
+                font-style: italic;
+            }
+
+            .empty-state {
+                color: var(--text-muted);
+                font-size: 0.85rem;
+                font-style: italic;
+            }
+        </style>
+
+        <script>
+            const relationships = {{ relationships_json|safe }}; // Jinja2 template syntax - linter warning is false positive
+            console.log('Relationships data:', relationships);
+
+            function renderGroup(containerId, items, title) {
+                const container = document.getElementById(containerId);
+                if (!items || items.length === 0) {
+                    container.innerHTML = `<div class="rel-group"><div class="rel-group-title">${title}</div><div class="empty-state">None found</div></div>`;
+                    return;
+                }
+                let html = `<div class="rel-group"><div class="rel-group-title">${title}</div>`;
+                items.forEach(item => {
+                    html += `
+                        <a href="/idea/${item.id}" class="rel-card">
+                            <div class="rel-persona">${item.persona}</div>
+                            <div class="rel-preview">${item.content_preview}</div>
+                            ${item.reason ? `<div class="rel-reason">${item.reason}</div>` : ''}
+                        </a>`;
+                });
+                html += '</div>';
+                container.innerHTML = html;
+            }
+
+            function renderSemantic(containerId, items) {
+                const container = document.getElementById(containerId);
+                if (!items || items.length === 0) {
+                    container.innerHTML = '<div class="empty-state">No semantic relationships found</div>';
+                    return;
+                }
+                let html = '';
+                items.forEach(item => {
+                    html += `
+                        <a href="/idea/${item.id}" class="rel-card">
+                            <div class="rel-persona">${item.type}: ${item.persona}</div>
+                            <div class="rel-preview">${item.content_preview}</div>
+                            ${item.reason ? `<div class="rel-reason">${item.reason}</div>` : ''}
+                        </a>`;
+                });
+                container.innerHTML = html;
+            }
+
+            // Initialize
+            renderGroup('parents-container', relationships.parents, 'Parents (Evolved From)');
+            renderGroup('children-container', relationships.children, 'Children (Evolved Into)');
+            renderSemantic('semantic-container', relationships.semantic);
+
+            // Tab switching
+            document.querySelectorAll('.tab').forEach(tab => {
+                tab.addEventListener('click', function () {
+                    document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+                    document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+                    this.classList.add('active');
+                    document.getElementById(this.dataset.tab).classList.add('active');
+                });
+            });
+        </script>
+
         <div class="cta">
             <p style="color: var(--text-secondary); margin-bottom: 1.5rem;">
                 Did you find this interesting? We want your feedback to evolve better ideas for you.
