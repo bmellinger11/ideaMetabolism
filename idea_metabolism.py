@@ -619,10 +619,15 @@ If no relationships, return []."""
             if evals:
                 # Use first evaluation
                 e = evals[0]
+                
+                # Get overall interest with human feedback boost
+                breakdown = self.repository.get_score_breakdown(idea.id)
+                overall_interest = breakdown.get('combined_score', getattr(e, 'overall_interest', 0))
+                
                 scored_candidates.append({
                     "idea": idea,
                     "novelty": getattr(e, "novelty_score", 0),
-                    "feasibility": getattr(e, "feasibility_score", 0)
+                    "overall_interest": overall_interest
                 })
             else:
                 logger.warning(f"  Skipping {idea.id} for breeding: No evaluation found.")
@@ -635,16 +640,16 @@ If no relationships, return []."""
         parent_a_data = max(scored_candidates, key=lambda x: x['novelty'])
         parent_a = parent_a_data['idea']
         
-        # Select Parent B (Most Feasible) - distinct from A
+        # Select Parent B (Highest Overall Interest including human feedback) - distinct from A
         remaining = [c for c in scored_candidates if c['idea'].id != parent_a.id]
         if not remaining:
             return []
             
-        parent_b_data = max(remaining, key=lambda x: x['feasibility'])
+        parent_b_data = max(remaining, key=lambda x: x['overall_interest'])
         parent_b = parent_b_data['idea']
         
         logger.info(f"Parent A (Novelty {parent_a_data['novelty']:.2f}): {parent_a.content[:50]}...")
-        logger.info(f"Parent B (Feasibility {parent_b_data['feasibility']:.2f}): {parent_b.content[:50]}...")
+        logger.info(f"Parent B (Interest {parent_b_data['overall_interest']:.2f}): {parent_b.content[:50]}...")
         
         # 2. Crossover & Mutation
         prompt = f"""Perform an evolutionary synthesis of two ideas.
@@ -652,13 +657,13 @@ If no relationships, return []."""
 PARENT A (High Novelty):
 {parent_a.content}
 
-PARENT B (High Feasibility):
+PARENT B (High Interest):
 {parent_b.content}
 
 PROBLEM: {parent_a.problem_context}
 
 TASK: Generate a "Child Idea" that combines the core novel mechanism of Parent A 
-with the practical grounding of Parent B.
+with the proven appeal of Parent B (which has high user interest).
 The child should be a distinct concept, not just a concatenation. 
 Mutate the idea slightly to ensure it evolves beyond both parents.
 
@@ -711,7 +716,7 @@ Format as JSON:
             
             # Add Lineage Edges
             self.repository.add_relationship(child_id, parent_a.id, "DERIVED_FROM", "Novelty Parent")
-            self.repository.add_relationship(child_id, parent_b.id, "DERIVED_FROM", "Feasibility Parent")
+            self.repository.add_relationship(child_id, parent_b.id, "DERIVED_FROM", "Interest Parent")
             
             # Evaluate Child
             logger.info("Evaluating Child...")
