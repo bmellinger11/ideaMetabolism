@@ -1,6 +1,6 @@
 # Idea Metabolism POC
 
-A Persistent Creative Intelligence System that Learns and Evolves Ideas Over Time. Unlike traditional AI that forgets each conversation, this system builds a living memory of ideas that grow smarter through specialized AI personas, semantic analysis, and evolutionary breeding of concepts—transforming one-shot brainstorming into continuous creative intelligence.
+A Persistent Creative Intelligence System that Learns and Evolves Ideas Over Time. Unlike traditional AI that forgets each conversation, this system builds a living memory of ideas that grow smarter through specialized AI personas, semantic analysis, human feedback, and evolutionary breeding of concepts—transforming one-shot brainstorming into continuous creative intelligence.
 
 ## Purpose
 
@@ -11,23 +11,39 @@ Key capabilities:
 *   **Persistent Memory**: Ideas are stored in a Graph RAG repository, allowing the system to recall past solutions.
 *   **Semantic Novelty**: The system calculates how "new" an idea is by comparing its vector embedding against the existing knowledge graph.
 *   **Relationship Mapping**: Automatically detects if new ideas **CONTRADICT** or **REQUIRE** existing ideas.
-*   **Evolutionary Synthesis**: Actively "breeds" new ideas by combining the most *Novel* idea with the most *Feasible* idea from the current generation cycle **and** relevant history, creating offspring that inherit traits from both.
+*   **Evolutionary Synthesis**: Actively "breeds" new ideas by combining the most *Novel* idea with the highest *Interest* idea (including human feedback) from the current generation cycle **and** relevant history, creating offspring that inherit traits from both.
+*   **Human Feedback Loop**: Users can rate ideas (1-5 stars) and leave comments. Ratings boost/penalize scores, influencing which ideas are selected for breeding.
+*   **Lineage Visualization**: View parent-child relationships and semantic connections for any idea.
 
 ## Architecture
 
 ### Core Components
-*   **`idea_metabolism.py`**: The main orchestrator. Manages the LLM client, agents, and the 4-stage pipeline (Generation -> Triage -> Relationship Extraction -> Evolution).
+*   **`idea_metabolism.py`**: The main orchestrator. Manages the LLM client, agents, and the 4-stage pipeline (Generation → Triage → Relationship Extraction → Evolution).
 *   **`graph_repository.py`**: A **NetworkX**-based graph database.
     *   **Nodes**: Problems, Ideas, Domains.
     *   **Edges**: `ADDRESSES`, `RELATES_TO`, `CONTRADICTS`, `REQUIRES`, `DERIVED_FROM`.
     *   **Vector Search**: Uses `sentence-transformers` for semantic retrieval of problem contexts.
+    *   **Score Breakdown**: Provides AI score, human feedback stats, and combined interest score.
+*   **`application.py`**: Flask web server with API endpoints for idea generation, feedback, and individual idea pages.
 
 ### Data Flow
 1.  **Generation**: Agents generate ideas for a given Problem.
 2.  **Graph RAG**: The system embeds the Problem and retrieves semantically similar "Context Ideas" from the graph.
 3.  **Evaluation**: An Evaluator Agent scores new ideas on Novelty, Feasibility, and Surprise relative to the retrieved context.
 4.  **Linking**: The system identifies and creates semantic edges between new and existing ideas.
-5.  **Evolution**: The system identifies the "Most Novel" and "Most Feasible" ideas in the batch (plus relevant historical ideas) and synthesizes a "Child Idea" that attempts to maximize both traits. This child is then evaluated and stored with `DERIVED_FROM` lineage edges.
+5.  **Evolution**: The system identifies the "Most Novel" and "Highest Interest" ideas in the batch (plus relevant historical ideas) and synthesizes a "Child Idea" that attempts to maximize novelty while preserving proven appeal. This child is then evaluated and stored with `DERIVED_FROM` lineage edges.
+6.  **User Feedback**: Humans rate and comment on ideas. High ratings boost an idea's selection probability for future breeding.
+
+### Scoring System
+
+Ideas are ranked by **Combined Interest Score**:
+- **AI Interest**: Base score from LLM evaluation (novelty × feasibility × surprise)
+- **Human Feedback Multiplier**:
+  - 4.5+ stars → +50%
+  - 4.0+ stars → +25%
+  - 3.0+ stars → +10%
+  - 2.0+ stars → -20%
+  - Below 2.0 → -50%
 
 ## Setup & Usage
 
@@ -42,7 +58,7 @@ Key capabilities:
     ```bash
     pip install -r requirements.txt
     ```
-    *Dependencies include: `anthropic`, `openai`, `google-generativeai`, `numpy`, `scikit-learn`, `sentence-transformers`, `networkx`, `python-dotenv`.*
+    *Dependencies include: `anthropic`, `openai`, `google-generativeai`, `numpy`, `scikit-learn`, `sentence-transformers`, `networkx`, `python-dotenv`, `filelock`.*
 
 3.  **Environment Setup**:
     Create a `.env` file in the root directory:
@@ -51,6 +67,7 @@ Key capabilities:
     # Optional:
     # OPENAI_API_KEY=sk-...
     # GOOGLE_API_KEY=...
+    # BASE_URL=https://your-domain.com  # For shareable idea links
     ```
 
 ### Running the System
@@ -91,8 +108,14 @@ The system includes a Flask-based mobile-friendly web interface.
 2.  **Access**:
     Open your browser and navigate to `http://localhost:5000` (or your machine's IP address).
 
-    *   **Repo Only Checked**: Search existing ideas.
-    *   **Repo Only Unchecked**: Generate new ideas (configure "Ideas per Persona" to control volume).
+    *   **Strategy Dropdown**: Choose "Mix" (new + history), "New Only", or "Search Memory Only".
+    *   Click on any idea card to open the detail modal with rating, comment, and share options.
+
+3.  **Individual Idea Pages** (`/idea/<id>`):
+    *   View full idea content and AI evaluation
+    *   See score breakdown (AI Interest, User Feedback, Combined Score)
+    *   Explore **Lineage** (parent/child relationships) and **Other Connections** (semantic relationships)
+    *   Share via X, LinkedIn, or copy link
 
 The system will:
 1.  Generate ~3 ideas from different personas (plus 1 synthesized from evolutionary cross-breeding).
