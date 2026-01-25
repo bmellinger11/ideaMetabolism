@@ -351,12 +351,16 @@ Respond in JSON format:
         if not existing_embeddings:
             return 0.8
         
-        # Compute cosine similarity to nearest neighbor
+        # Compute cosine similarity
         similarities = cosine_similarity([idea.embedding], existing_embeddings)[0]
-        max_similarity = np.max(similarities)
         
-        # Novelty is inverse of similarity
-        return 1.0 - max_similarity
+        # k-NN Approach (k=5)
+        sorted_sims = np.sort(similarities)[::-1]
+        k = 5
+        top_k = sorted_sims[:k]
+        mean_similarity = np.mean(top_k)
+        
+        return 1.0 - mean_similarity
 
 
 class IdeaRepository:
@@ -624,9 +628,13 @@ If no relationships, return []."""
                 breakdown = self.repository.get_score_breakdown(idea.id)
                 overall_interest = breakdown.get('combined_score', getattr(e, 'overall_interest', 0))
                 
+                # Get dynamic novelty
+                novelty_breakdown = self.repository.get_score_breakdown(idea.id, metric="novelty")
+                dynamic_novelty = novelty_breakdown.get('combined_score', getattr(e, "novelty_score", 0))
+                
                 scored_candidates.append({
                     "idea": idea,
-                    "novelty": getattr(e, "novelty_score", 0),
+                    "novelty": dynamic_novelty,
                     "overall_interest": overall_interest
                 })
             else:
