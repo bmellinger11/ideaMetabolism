@@ -9,9 +9,9 @@ Standard LLM interactions are ephemeral: you ask for ideas, get a list, and the 
 Key capabilities:
 *   **Diverse Personas**: "Convergent", "Divergent", and "Alternative" agents generate distinct types of ideas.
 *   **Persistent Memory**: Ideas are stored in a Graph RAG repository, allowing the system to recall past solutions.
-*   **Semantic Novelty**: The system calculates how "new" an idea is by comparing its vector embedding against the existing knowledge graph.
+*   **Semantic Novelty**: The system calculates how "new" an idea is by comparing its vector embedding against existing knowledge. It uses a **k-Nearest Neighbor** approach to prevent duplicates while respecting problem-specific contexts.
 *   **Relationship Mapping**: Automatically detects if new ideas **CONTRADICT** or **REQUIRE** existing ideas.
-*   **Evolutionary Synthesis**: Actively "breeds" new ideas by combining the most *Novel* idea with the highest *Interest* idea (including human feedback) from the current generation cycle **and** relevant history, creating offspring that inherit traits from both.
+*   **Evolutionary Synthesis**: Actively "breeds" new ideas by combining the most *Novel* (based on k-NN score) idea with the highest *Interest* idea from the current generation cycle **and** relevant history, creating offspring that inherit traits from both.
 *   **Human Feedback Loop**: Users can rate ideas (1-5 stars) and leave comments. Ratings boost/penalize scores, influencing which ideas are selected for breeding.
 *   **Lineage Visualization**: View parent-child relationships and semantic connections for any idea.
 
@@ -44,6 +44,15 @@ Ideas are ranked by **Combined Interest Score**:
   - 3.0+ stars → +10%
   - 2.0+ stars → -20%
   - Below 2.0 → -50%
+47: 
+### Novelty Calculation
+The system uses a dynamic, problem-scoped novelty score:
+1.  **Dynamic**: Calculated at query time against the *current* state of the database, so scores update as new ideas are added.
+2.  **Problem-Scoped**: An idea is only compared against other ideas that address the *same* problem. Ideas in different domains (e.g., "Cooking" vs "Transport") do not affect each other's novelty.
+3.  **k-NN Similarity**: Instead of checking for a single duplicate (Max Similarity), the system calculates the **Average Similarity of the top 5 nearest neighbors**. This ensures that:
+    -   Single outliers don't artificially tank a score.
+    -   Clusters of similar ideas progressively lower the novelty for all members of that cluster.
+
 
 ## Setup & Usage
 

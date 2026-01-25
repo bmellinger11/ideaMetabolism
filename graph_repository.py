@@ -550,13 +550,23 @@ class GraphRepository:
                 other_embeddings.append(emb)
         
         if not other_embeddings:
-            return 0.8
+            return 0.8  # Default high novelty
 
         # Compute cosine similarity
         similarities = cosine_similarity([target_embedding], other_embeddings)[0]
-        max_similarity = np.max(similarities)
         
-        return 1.0 - max_similarity
+        # k-NN Approach (k=5)
+        # Sort similarities descending
+        sorted_sims = np.sort(similarities)[::-1]
+        
+        # Take top k (or all if fewer than k)
+        k = 5
+        top_k = sorted_sims[:k]
+        
+        # Compute mean similarity of the neighborhood
+        mean_similarity = np.mean(top_k)
+        
+        return 1.0 - mean_similarity
 
 
 if __name__ == "__main__":
