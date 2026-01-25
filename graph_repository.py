@@ -227,11 +227,48 @@ class GraphRepository:
         # 1. AI Score
         evals = data.get('evaluations', [])
         ai_score = 0.5
+        
+        # Calculate dynamic novelty
+        dynamic_novelty = self.compute_current_novelty(idea_id)
+        
+        if metric == "novelty":
+            return {"combined_score": dynamic_novelty, "ai_score": dynamic_novelty, "boost_reason": ""}
+
         if evals:
-            # Metric lookup
-            score_key = f"{metric}_score" if metric != "overall_interest" else "overall_interest"
-            scores = [e.get(score_key, 0.5) for e in evals]
-            ai_score = float(np.mean(scores))
+            # We use the dynamic novelty instead of the stored one
+            # The AI score typically averages multiple dimensions. 
+            # We'll treat novelty as one equal weighted component if we are just averaging.
+            # OR we can assume the user wants `novelty` metric specifically.
+            
+            # Standard weighted average of components? 
+            # The current impl was just averaging generic scores.
+            # Let's reconstruct the average but swap in dynamic novelty.
+            
+            # Extract other scores from latest eval (assuming single authoritative eval for now)
+            latest_eval = evals[-1]
+            
+            # Components from Evaluation class
+            feasibility = latest_eval.get('feasibility_score', 0.5)
+            surprise = latest_eval.get('surprise_score', 0.5)
+            # coherence = latest_eval.get('coherence_score', 0.5) 
+            # generativity = latest_eval.get('generativity_score', 0.5)
+            interest = latest_eval.get('overall_interest', 0.5)
+
+            if metric == "overall_interest":
+                # If specifically asking for overall interest, we might want to re-calculate it 
+                # as a function of the new novelty?
+                # The original "overall_interest" from the LLM is a "gut check". 
+                # But if novelty drops, interest SHOULD drop.
+                # Simple heuristic: re-weight interest based on novelty change?
+                # For simplicity/robustness: Let's average (Novelty + Feasibility + Surprise + Interest) / 4
+                # This ensures novelty directly impacts the ranking.
+                scores = [dynamic_novelty, feasibility, surprise, interest]
+                ai_score = float(np.mean(scores))
+            else:
+                # Fallback for specific metric requests other than novelty/interest
+                score_key = f"{metric}_score"
+                ai_score = latest_eval.get(score_key, 0.5)
+
         
         # 2. Human Feedback
         feedback = data.get('human_feedback', [])
@@ -467,6 +504,59 @@ class GraphRepository:
             f"Graph has {self.graph.number_of_nodes()} nodes "
             f"and {self.graph.number_of_edges()} edges."
         )
+
+
+    def compute_current_novelty(self, idea_id: str) -> float:
+        """Compute novelty as distance from other ideas in the SAME problem context"""
+        if not self.graph.has_node(idea_id):
+            return 0.0
+            
+        target_embedding = self.graph.nodes[idea_id].get('embedding')
+        if target_embedding is None:
+            return 0.0
+            
+        # 1. Find the problem(s) this idea addresses
+        # In DiGraph: Idea -> ADDRESSES -> Problem
+        # So Problem is a successor of Idea
+        problem_ids = [
+            n for n in self.graph.successors(idea_id) 
+            if self.graph.nodes[n].get('type') == 'problem'
+        ]
+        
+        if not problem_ids:
+            # Fallback: compare against all if no problem context found (orphan idea)
+            # Or return default? Let's fallback for safety.
+            candidates = [n for n in self.graph.nodes if self.graph.nodes[n].get('type') == 'idea' and n != idea_id]
+        else:
+            # 2. Find all ideas that address these problems (Siblings)
+            # Idea -> Problem. So we look for Predecessors of the Problem nodes.
+            candidates = set()
+            for pid in problem_ids:
+                siblings = [
+                    n for n in self.graph.predecessors(pid) 
+                    if self.graph.nodes[n].get('type') == 'idea' and n != idea_id
+                ]
+                candidates.update(siblings)
+            candidates = list(candidates)
+            
+        if not candidates:
+            return 0.8  # Unique in its problem space
+
+        # Get embeddings
+        other_embeddings = []
+        for n in candidates:
+            emb = self.graph.nodes[n].get('embedding')
+            if emb is not None:
+                other_embeddings.append(emb)
+        
+        if not other_embeddings:
+            return 0.8
+
+        # Compute cosine similarity
+        similarities = cosine_similarity([target_embedding], other_embeddings)[0]
+        max_similarity = np.max(similarities)
+        
+        return 1.0 - max_similarity
 
 
 if __name__ == "__main__":
