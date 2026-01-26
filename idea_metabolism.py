@@ -668,7 +668,7 @@ PARENT A (High Novelty):
 PARENT B (High Interest):
 {parent_b.content}
 
-PROBLEM: {parent_a.problem_context}
+PROBLEM: {current_problem}
 
 TASK: Generate a "Child Idea" that combines the core novel mechanism of Parent A 
 with the proven appeal of Parent B (which has high user interest).
@@ -701,7 +701,8 @@ Format as JSON:
                 persona="evolutionary_synthesis",
                 temperature=0.7,
                 timestamp=datetime.now().isoformat(),
-                problem_context=parent_a.problem_context,
+                # problem_context=parent_a.problem_context,
+                problem_context=current_problem,  # Use current problem context
                 embedding=None
             )
             
