@@ -518,7 +518,7 @@ class IdeaMetabolismSystem:
         # Extract relationships (NEW)
         self.extract_relationships(ideas, existing_ideas)
         
-        self.repository.save()
+
 
     def extract_relationships(self, new_ideas: List[Idea], existing_ideas: List[Idea]):
         """Stage 3: Extract semantic relationships between ideas"""
@@ -757,7 +757,7 @@ Format as JSON:
             logger.error(f"Error during evolution: {e}")
             
         # Ensure changes are saved to disk
-        self.repository.save()
+
         return newly_created
     
     def display_top_ideas(self, n: int = 5, problem: Optional[str] = None):

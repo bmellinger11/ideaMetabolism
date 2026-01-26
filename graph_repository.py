@@ -312,6 +312,19 @@ class GraphRepository:
         with self.lock:
             self.load()
             if self.graph.has_node(source_idea_id) and self.graph.has_node(target_idea_id):
+                # Check for existing edge
+                if self.graph.has_edge(source_idea_id, target_idea_id):
+                    existing_data = self.graph.edges[source_idea_id, target_idea_id]
+                    existing_type = existing_data.get("relation")
+                    
+                    # Protected types that cannot be overwritten
+                    protected_types = {"DERIVED_FROM", "EVOLVED_FROM"}
+                    
+                    if existing_type in protected_types and relation_type not in protected_types:
+                        logger.info(f"Ignoring overwrite of protected relationship {existing_type} with {relation_type} for {source_idea_id}->{target_idea_id}")
+                        # Do not update
+                        return
+
                 self.graph.add_edge(source_idea_id, target_idea_id, relation=relation_type, reason=reason)
             self.save()
 
