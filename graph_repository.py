@@ -485,38 +485,7 @@ class GraphRepository:
                 data = json.load(f)
             self.graph = nx.node_link_graph(data, edges="links")
 
-    def migrate_from_json(self, json_path: str):
-        """One-time migration utility"""
-        if not os.path.exists(json_path):
-            return
-            
-        with open(json_path, 'r') as f:
-            data = json.load(f)
-            
-        ideas = data.get("ideas", {})
-        evaluations = data.get("evaluations", {})
-        
-        print(f"Migrating {len(ideas)} ideas to graph...")
-        
-        for idea_id, idea_dict in ideas.items():
-            # 1. Create Problem Node (Deduplicated by text hash in add_problem)
-            prob_text = idea_dict.get('problem_context', 'Unknown Problem')
-            prob_id = self.add_problem(prob_text)
-            
-            # 2. Add Idea Node
-            self.add_idea(idea_dict, prob_id)
-            
-            # 3. Add Evaluations
-            if idea_id in evaluations:
-                for ev in evaluations[idea_id]:
-                    self.add_evaluation(ev)
-            
-        self.save()
-        print(
-            f"Migration complete. "
-            f"Graph has {self.graph.number_of_nodes()} nodes "
-            f"and {self.graph.number_of_edges()} edges."
-        )
+
 
 
     def compute_current_novelty(self, idea_id: str) -> float:
@@ -582,7 +551,3 @@ class GraphRepository:
         return 1.0 - mean_similarity
 
 
-if __name__ == "__main__":
-    # Test/Migration script
-    repo = GraphRepository()
-    repo.migrate_from_json("idea_repository.json")

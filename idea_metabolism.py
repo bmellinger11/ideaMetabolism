@@ -363,72 +363,7 @@ Respond in JSON format:
         return 1.0 - mean_similarity
 
 
-class IdeaRepository:
-    """Stores and queries ideas and evaluations"""
-    
-    def __init__(self, filepath: str = "idea_repository.json"):
-        self.filepath = filepath
-        self.ideas: Dict[str, Idea] = {}
-        self.evaluations: Dict[str, List[Evaluation]] = {}
-        self.load()
-    
-    def add_idea(self, idea: Idea):
-        """Add an idea to repository"""
-        self.ideas[idea.id] = idea
-        self.evaluations[idea.id] = []
-    
-    def add_evaluation(self, evaluation: Evaluation):
-        """Add an evaluation to repository"""
-        if evaluation.idea_id in self.evaluations:
-            self.evaluations[evaluation.idea_id].append(evaluation)
-    
-    def get_top_ideas(
-            self,
-            n: int = 10,
-            metric: str = "overall_interest",
-            problem_filter: Optional[str] = None
-    ) -> List[tuple]:
-        """Get top N ideas by specified metric, optionally filtered by problem"""
-        
-        scored_ideas = []
-        for idea_id, idea in self.ideas.items():
-            # Apply problem filter if specified
-            if problem_filter and idea.problem_context != problem_filter:
-                continue
-                
-            evals = self.evaluations.get(idea_id, [])
-            if evals:
-                # Average score across evaluations
-                scores = [
-                    getattr(e, f"{metric}_score" if metric != "overall_interest" else "overall_interest")
-                    for e in evals
-                ]
-                avg_score = np.mean(scores)
-                scored_ideas.append((idea, avg_score))
-        
-        scored_ideas.sort(key=lambda x: x[1], reverse=True)
-        return scored_ideas[:n]
-    
-    def save(self):
-        """Save repository to disk"""
-        data = {
-            "ideas": {k: v.to_dict() for k, v in self.ideas.items()},
-            "evaluations": {k: [e.to_dict() for e in v] for k, v in self.evaluations.items()}
-        }
-        with open(self.filepath, 'w') as f:
-            json.dump(data, f, indent=2)
-    
-    def load(self):
-        """Load repository from disk"""
-        if os.path.exists(self.filepath):
-            with open(self.filepath, 'r') as f:
-                data = json.load(f)
-            
-            self.ideas = {k: Idea(**v) for k, v in data.get("ideas", {}).items()}
-            self.evaluations = {
-                k: [Evaluation(**e) for e in v] 
-                for k, v in data.get("evaluations", {}).items()
-            }
+
 
 
 class IdeaMetabolismSystem:
