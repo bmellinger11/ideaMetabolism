@@ -211,7 +211,9 @@ Focus on maximally different approaches, even if they seem impractical."""
 
 PROBLEM: {problem}
 
-Generate {num_ideas} distinct ideas to address this problem. For each idea:
+Generate {num_ideas} distinct ideas to address this problem, or directly complete the task as framed by the user in the problem statement. 
+
+For each idea or task:
 1. State the core concept clearly
 2. Explain why it might work
 3. Identify key assumptions or prerequisites
@@ -363,9 +365,6 @@ Respond in JSON format:
         return 1.0 - mean_similarity
 
 
-
-
-
 class IdeaMetabolismSystem:
     """Main orchestrator for the idea generation and evaluation pipeline"""
     
@@ -453,7 +452,6 @@ class IdeaMetabolismSystem:
         # Extract relationships (NEW)
         self.extract_relationships(ideas, existing_ideas)
         
-
 
     def extract_relationships(self, new_ideas: List[Idea], existing_ideas: List[Idea]):
         """Stage 3: Extract semantic relationships between ideas"""
@@ -605,10 +603,13 @@ PARENT B (High Interest):
 
 PROBLEM: {current_problem}
 
-TASK: Generate a "Child Idea" that combines the core novel mechanism of Parent A 
+TASK: Generate a creative hybrid response to the stated problem
+above, that combines the core novel mechanism of Parent A 
 with the proven appeal of Parent B (which has high user interest).
-The child should be a distinct concept, not just a concatenation. 
-Mutate the idea slightly to ensure it evolves beyond both parents.
+The child should be a distinct response that addresses and adheres 
+to the stated problem, creatively integrating the two parent ideas, 
+not just a concatenation of the two parent ideas. Mutate the integrated 
+response slightly to ensure it evolves beyond both parents.
 
 Format as JSON:
 {{
