@@ -23,10 +23,10 @@ def view_idea(idea_id):
     """Display a single idea by ID"""
     try:
         # Get idea from repository
-        if idea_id not in system.repository.graph.nodes:
-            return "Idea not found", 404
+        idea_data = system.repository.get_idea(idea_id)
         
-        idea_data = system.repository.graph.nodes[idea_id]
+        if not idea_data:
+            return "Idea not found", 404
         
         # Get evaluations
         evals = system.repository.get_evaluations(idea_id)
@@ -115,5 +115,5 @@ def process():
 
 
 if __name__ == '__main__':
-    # application.run(debug=True, host='0.0.0.0', port=5000)
-    application.run(port=5000)
+    application.run(debug=True, host='0.0.0.0', port=5000)  # for troubleshooting
+    # application.run(port=5000)  # for production service with proxy front-end

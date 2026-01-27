@@ -90,6 +90,21 @@ class GraphRepository:
             
             self.save()
 
+    def get_idea(self, idea_id: str) -> Optional[Dict[str, Any]]:
+        """Get idea data, attempting to reload from disk if not found in memory"""
+        # 1. Fast path: check memory
+        if self.graph.has_node(idea_id):
+            return self.graph.nodes[idea_id]
+            
+        # 2. Slow path: reload and check again
+        # This handles cases where another process added the idea
+        with self.lock:
+            self.load()
+            if self.graph.has_node(idea_id):
+                return self.graph.nodes[idea_id]
+                
+        return None
+
     def get_top_ideas(
             self,
             n: int = 10,
